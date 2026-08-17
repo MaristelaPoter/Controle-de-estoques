@@ -399,7 +399,7 @@
       <div class="view" id="view-aberto">
         <div class="storage-banner" id="storageBanner">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/></svg>
-          <span>O armazenamento local deste navegador está indisponível — os dados podem não ser salvos entre sessões. Exporte um backup regularmente.</span>
+          <span id="storageBannerText">Não foi possível conectar à sincronização compartilhada agora — trabalhando com a última cópia salva neste navegador. Suas alterações serão sincronizadas assim que a conexão voltar.</span>
           <span class="actions"><button type="button" id="btnBannerBackup">Exportar backup</button></span>
         </div>
         <div id="ledgerAberto"></div>
@@ -506,7 +506,30 @@
   </div>
 </div>
 
-<script>
+<script type="module">
+  // ================= Firebase (sincronização compartilhada) =================
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+  import {
+    getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp, enableIndexedDbPersistence
+  } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCYR4MPZi8J16RhsmrWRwNngcHZfROU1NY",
+    authDomain: "controle-de-depositos-599cd.firebaseapp.com",
+    projectId: "controle-de-depositos-599cd",
+    storageBucket: "controle-de-depositos-599cd.firebasestorage.app",
+    messagingSenderId: "902783447919",
+    appId: "1:902783447919:web:470275956bdcd5476c2e9a",
+    measurementId: "G-CTFRRHTVQ9"
+  };
+  const firebaseApp = initializeApp(firebaseConfig);
+  const db = getFirestore(firebaseApp);
+  const FS_COLLECTION = 'painel_estoques_023_014';
+  // Ativa o cache offline nativo do Firestore: se a internet cair, as
+  // alterações feitas na tela ficam guardadas e são enviadas sozinhas
+  // assim que a conexão voltar — sem precisar de nenhuma ação manual.
+  enableIndexedDbPersistence(db).catch(() => { /* não suportado neste navegador — segue sem cache offline nativo */ });
+
 (function(){
   'use strict';
 
@@ -541,24 +564,49 @@
       tx.onerror = () => reject(tx.error);
     });
   }
+  // Firestore é a fonte principal (compartilhada entre todos os usuários).
+  // O IndexedDB local funciona como cache de apoio: se a internet cair ou o
+  // Firestore falhar, o painel continua funcionando com a última cópia
+  // conhecida, em vez de travar ou perder os dados da tela.
+  let firestoreOk = true;
   const Store = {
     async get(key){
-      try{ return await idbGet(key); }
-      catch(e){ return null; }
+      try{
+        const snap = await getDoc(doc(db, FS_COLLECTION, key));
+        firestoreOk = true;
+        const value = snap.exists() ? snap.data().items : null;
+        if(value != null) await idbSet(key, value);
+        return value;
+      }catch(e){
+        firestoreOk = false;
+        try{ return await idbGet(key); }
+        catch(e2){ return null; }
+      }
     },
     async set(key, value){
-      try{ await idbSet(key, value); return true; }
-      catch(e){ return false; }
+      let sharedOk = false;
+      try{
+        await setDoc(doc(db, FS_COLLECTION, key), { items: value, updatedAt: serverTimestamp() });
+        sharedOk = true; firestoreOk = true;
+      }catch(e){ firestoreOk = false; }
+      try{ await idbSet(key, value); }
+      catch(e){ /* ignora — o Firestore já tentou salvar */ }
+      return sharedOk;
     }
   };
-  // Testa se o armazenamento local realmente funciona neste navegador.
-  // Se falhar, mostramos um aviso persistente sugerindo backup manual,
-  // em vez de deixar o usuário descobrir isso só quando perder dados.
+  // Escuta mudanças feitas por outras pessoas em tempo real e atualiza a
+  // tela automaticamente, sem precisar dar F5.
+  function watchRemoteChanges(key, onChange){
+    onSnapshot(doc(db, FS_COLLECTION, key), snap => {
+      if(snap.exists() && snap.data().items) onChange(snap.data().items);
+    }, () => { firestoreOk = false; });
+  }
+  // Testa se o Firestore (compartilhado) está acessível. Se não estiver,
+  // mostramos um aviso: o painel continua usável, mas só com dados locais.
   async function probeStorage(){
     try{
-      await idbSet('__probe__', 1);
-      const v = await idbGet('__probe__');
-      return v === 1;
+      await getDoc(doc(db, FS_COLLECTION, K_SETORES));
+      return true;
     }catch(e){ return false; }
   }
 
@@ -1449,6 +1497,17 @@
     document.getElementById('updatedTagText').textContent = 'Contagem atualizada — ' + d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
   }
 
+  // Evita perder o que a pessoa está digitando: se um campo de atualização
+  // estiver em foco, adia o redesenho da tabela até ela terminar de editar.
+  function safeRerenderAberto(){
+    if(document.activeElement && document.activeElement.classList && document.activeElement.classList.contains('atualizacao-cell')) return;
+    renderAberto();
+  }
+  function safeRerenderConc(){
+    if(document.activeElement && document.activeElement.classList && document.activeElement.classList.contains('atualizacao-cell')) return;
+    renderConcluidos();
+  }
+
   // ================= Init =================
   async function init(){
     await loadAll();
@@ -1464,12 +1523,26 @@
     const storageOk = await probeStorage();
     if(!storageOk) document.getElementById('storageBanner').classList.add('show');
 
+    // Sincronização em tempo real: quando outra pessoa cadastra, edita ou
+    // conclui um item, a tela de todo mundo é atualizada sozinha.
+    watchRemoteChanges(K_REGISTROS, items => { state.registros = items; renderCounts(); safeRerenderAberto(); safeRerenderConc(); });
+    watchRemoteChanges(K_NC_REGISTROS, items => { state.ncRegistros = items; renderCounts(); safeRerenderAberto(); safeRerenderConc(); });
+    watchRemoteChanges(K_ITENS, items => {
+      state.itens = items; renderDatalist();
+      if(document.getElementById('view-cadastro').classList.contains('active')) renderItemCatalog();
+    });
+    watchRemoteChanges(K_SETORES, items => {
+      state.setores = items; renderSetorSelect();
+      if(document.getElementById('view-cadastro').classList.contains('active')) renderSetorCatalog();
+    });
+
     // Recalcula a contagem de dias periodicamente e ao voltar o foco na aba,
     // garantindo que "dias em aberto" reflita sempre a data atual.
     setInterval(() => {
       updateClock();
       const activeView = document.querySelector('.view.active').id;
       if(activeView === 'view-aberto') renderAberto();
+      document.getElementById('storageBanner').classList.toggle('show', !firestoreOk);
     }, 60000);
     document.addEventListener('visibilitychange', () => {
       if(!document.hidden){
@@ -1480,6 +1553,7 @@
     });
   }
   init();
+
 
 })();
 </script>
