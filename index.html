@@ -225,9 +225,9 @@
   .history-list .ts{ font-family:var(--mono); color:var(--ink-faint); white-space:nowrap;}
 
   /* Indicadores por setor/depósito */
-  .breakdown-grid{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-bottom:24px;}
-  @media(max-width:1100px){ .breakdown-grid{ grid-template-columns:1fr 1fr;} }
-  @media(max-width:820px){ .breakdown-grid{ grid-template-columns:1fr;} }
+  .breakdown-grid{ display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:16px; margin-bottom:24px;}
+  @media(max-width:1300px){ .breakdown-grid{ grid-template-columns:1fr 1fr;} }
+  @media(max-width:560px){ .breakdown-grid{ grid-template-columns:1fr;} }
   .breakdown-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md); padding:16px 18px;}
   .breakdown-card h4{ margin:0 0 12px; font-size:12px; text-transform:uppercase; letter-spacing:.4px; color:var(--ink-muted);}
   .bar-row{ display:flex; align-items:center; gap:10px; margin-bottom:8px; font-size:12px;}
@@ -1222,25 +1222,32 @@
     return retra.concat(nc);
   }
   function renderBreakdown(list, containerId){
-    const bySetor = {}, byDeposito = {}, custoPorSetor = {};
+    const bySetor = {}, byDeposito = {}, custoPorSetor = {}, custoPorDeposito = {};
     list.forEach(r => {
       bySetor[r.setor] = (bySetor[r.setor]||0) + 1;
       byDeposito[r.deposito||'—'] = (byDeposito[r.deposito||'—']||0) + 1;
-      if(r.valorUnitario!=null && r.quantidade!=null) custoPorSetor[r.setor] = (custoPorSetor[r.setor]||0) + r.valorUnitario*r.quantidade;
+      if(r.valorUnitario!=null && r.quantidade!=null){
+        custoPorSetor[r.setor] = (custoPorSetor[r.setor]||0) + r.valorUnitario*r.quantidade;
+        custoPorDeposito[r.deposito||'—'] = (custoPorDeposito[r.deposito||'—']||0) + r.valorUnitario*r.quantidade;
+      }
     });
     const maxSetor = Math.max(1, ...Object.values(bySetor));
     const maxDep = Math.max(1, ...Object.values(byDeposito));
     const maxCusto = Math.max(1, ...Object.values(custoPorSetor));
+    const maxCustoDep = Math.max(1, ...Object.values(custoPorDeposito));
     const barsSetor = Object.entries(bySetor).sort((a,b)=>b[1]-a[1]).slice(0,8)
       .map(([s,n]) => '<div class="bar-row"><span class="bar-label" title="'+esc(s)+'">'+esc(s)+'</span><span class="bar-track"><span class="bar-fill" style="width:'+(n/maxSetor*100)+'%"></span></span><span class="bar-val">'+n+'</span></div>').join('');
     const barsDep = Object.entries(byDeposito).sort((a,b)=>b[1]-a[1])
       .map(([d,n]) => '<div class="bar-row"><span class="bar-label">Depósito '+esc(d)+'</span><span class="bar-track"><span class="bar-fill" style="width:'+(n/maxDep*100)+'%"></span></span><span class="bar-val">'+n+'</span></div>').join('');
     const barsCusto = Object.entries(custoPorSetor).sort((a,b)=>b[1]-a[1]).slice(0,8)
       .map(([s,v]) => '<div class="bar-row"><span class="bar-label" title="'+esc(s)+'">'+esc(s)+'</span><span class="bar-track"><span class="bar-fill" style="width:'+(v/maxCusto*100)+'%"></span></span><span class="bar-val" style="width:auto; font-size:11px;">'+fmtBRL(v)+'</span></div>').join('');
+    const barsCustoDep = Object.entries(custoPorDeposito).sort((a,b)=>b[1]-a[1])
+      .map(([d,v]) => '<div class="bar-row"><span class="bar-label">Depósito '+esc(d)+'</span><span class="bar-track"><span class="bar-fill" style="width:'+(v/maxCustoDep*100)+'%"></span></span><span class="bar-val" style="width:auto; font-size:11px;">'+fmtBRL(v)+'</span></div>').join('');
     document.getElementById(containerId).innerHTML =
       '<div class="breakdown-card"><h4>Em aberto por setor</h4>'+(barsSetor||'<p class="section-desc">Sem dados.</p>')+'</div>' +
       '<div class="breakdown-card"><h4>Em aberto por depósito</h4>'+(barsDep||'<p class="section-desc">Sem dados.</p>')+'</div>' +
-      '<div class="breakdown-card"><h4>Custo por setor</h4>'+(barsCusto||'<p class="section-desc">Nenhum registro com valor informado.</p>')+'</div>';
+      '<div class="breakdown-card"><h4>Custo por setor</h4>'+(barsCusto||'<p class="section-desc">Nenhum registro com valor informado.</p>')+'</div>' +
+      '<div class="breakdown-card"><h4>Custo por depósito</h4>'+(barsCustoDep||'<p class="section-desc">Nenhum registro com valor informado.</p>')+'</div>';
   }
   function renderTrend(abertos){
     const last7 = abertos.filter(r => { const d = daysBetween(r.dataInicio, todayISO()); return d != null && d <= 7; }).length;
