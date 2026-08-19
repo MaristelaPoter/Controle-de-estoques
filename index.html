@@ -270,6 +270,7 @@
   body.is-viewer .row-actions .reopen-btn,
   body.is-viewer .row-check,
   body.is-viewer .batch-bar{ display:none !important;}
+  body.is-viewer .admin-only{ display:none !important;}
   body.is-viewer textarea.atualizacao-cell{ background:var(--paper); color:var(--ink-muted); cursor:not-allowed;}
   body.is-viewer .viewer-tag{ display:inline-block !important;}
 
@@ -329,6 +330,10 @@
       <button class="tab" data-view="concluidos">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
         Concluídos <span class="count" id="countConc">0</span>
+      </button>
+      <button class="tab" data-view="saldo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        Saldo Diário
       </button>
       <button class="tab" data-view="cadastro">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
@@ -494,6 +499,18 @@
         <div id="concTableArea"></div>
       </div>
 
+      <!-- ===================== SALDO DIÁRIO ===================== -->
+      <div class="view" id="view-saldo">
+        <h3 class="section-title">Saldo Diário <span class="n" id="nSaldo">0</span></h3>
+        <p class="section-desc">Custo total dos itens em aberto, capturado automaticamente todo dia às 16:58 (ou manualmente, quando necessário), separado por depósito.</p>
+        <div class="form-card admin-only" style="max-width:none; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+          <button type="button" class="btn-primary" id="btnRegistrarSaldo">Registrar saldo de hoje agora</button>
+          <button type="button" class="btn-ghost" id="btnExportSaldo">Exportar CSV</button>
+          <span class="form-note" id="saldoNote"></span>
+        </div>
+        <div id="saldoTableArea"></div>
+      </div>
+
       <!-- ===================== CADASTROS ===================== -->
       <div class="view" id="view-cadastro">
         <div class="cad-grid">
@@ -579,7 +596,8 @@
   // ================= Firebase (sincronização compartilhada) =================
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
   import {
-    getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp, enableIndexedDbPersistence
+    getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp, enableIndexedDbPersistence,
+    collection
   } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
   import {
     getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail
@@ -897,6 +915,7 @@
     if(name === 'concluidos') renderConcluidos();
     if(name === 'cadastro') renderCadastros();
     if(name === 'novo') renderChips();
+    if(name === 'saldo') renderSaldoDiario();
   }
   document.getElementById('tabs').addEventListener('click', e=>{
     const btn = e.target.closest('button.tab');
@@ -1230,6 +1249,90 @@
       .map(r => ({ ...r, kind:'nc', desc: r.descricaoNC, tipoLabel:'Depósito 023' }));
     return retra.concat(nc);
   }
+
+  // ================= Saldo Diário (custo total em aberto, por depósito) =================
+  const SALDO_COLLECTION = 'saldo_diario_023_014';
+  function computeSaldoAtual(){
+    const abertos = combinedList('aberto');
+    let d014 = 0, d023 = 0;
+    abertos.forEach(r => {
+      if(r.valorUnitario == null || r.quantidade == null) return;
+      const v = r.valorUnitario * r.quantidade;
+      if(r.deposito === '014') d014 += v;
+      else if(r.deposito === '023') d023 += v;
+    });
+    return { deposito014: d014, deposito023: d023, total: d014 + d023 };
+  }
+  async function capturarSaldoDoDia(forcar){
+    const dateStr = todayISO();
+    const ref = doc(db, SALDO_COLLECTION, dateStr);
+    if(!forcar){
+      try{
+        const snap = await getDoc(ref);
+        if(snap.exists()) return false; // já capturado hoje, não sobrescreve automaticamente
+      }catch(e){ return false; }
+    }
+    const saldo = computeSaldoAtual();
+    try{
+      await setDoc(ref, {
+        ...saldo,
+        capturadoEm: new Date().toISOString(),
+        capturadoPor: currentUserEmail || '—',
+        automatico: !forcar
+      });
+      return true;
+    }catch(e){ return false; }
+  }
+  let saldoCache = {};
+  function watchSaldoDiario(){
+    onSnapshot(collection(db, SALDO_COLLECTION), snap => {
+      saldoCache = {};
+      snap.forEach(d => { saldoCache[d.id] = d.data(); });
+      if(document.getElementById('view-saldo').classList.contains('active')) renderSaldoDiario();
+    }, () => {});
+  }
+  function renderSaldoDiario(){
+    const dias = Object.keys(saldoCache).sort().reverse();
+    document.getElementById('nSaldo').textContent = dias.length;
+    if(!dias.length){ document.getElementById('saldoTableArea').innerHTML = '<div class="empty-note">Nenhum saldo registrado ainda. O primeiro será capturado automaticamente às 16:58, ou use o botão acima para registrar agora.</div>'; return; }
+    const rows = dias.map(d => {
+      const s = saldoCache[d];
+      return '<tr><td>'+fmtDateBR(d)+'</td><td class="num">'+fmtBRL(s.deposito014||0)+'</td><td class="num">'+fmtBRL(s.deposito023||0)+'</td><td class="num" style="font-weight:700;">'+fmtBRL(s.total||0)+'</td><td style="font-size:11px; color:var(--ink-faint);">'+(s.automatico?'Automático':'Manual')+' às '+fmtDateTimeBR(s.capturadoEm).split(' às ')[1]+'</td></tr>';
+    }).join('');
+    document.getElementById('saldoTableArea').innerHTML = '<div class="table-wrap"><table><thead><tr><th>Data</th><th class="num">Depósito 014</th><th class="num">Depósito 023</th><th class="num">Total</th><th>Captura</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+  }
+  document.getElementById('btnRegistrarSaldo').addEventListener('click', async () => {
+    if(!isAdmin) return;
+    const note = document.getElementById('saldoNote');
+    note.textContent = 'Registrando...';
+    const ok = await capturarSaldoDoDia(true);
+    note.textContent = ok ? 'Saldo de hoje registrado.' : 'Não foi possível registrar.';
+    if(ok) toast('Saldo de hoje registrado.');
+  });
+  document.getElementById('btnExportSaldo').addEventListener('click', () => {
+    if(!isAdmin) return;
+    const dias = Object.keys(saldoCache).sort().reverse();
+    const csv = toCSV(dias.map(d => ({ data:d, ...saldoCache[d] })), [
+      { label:'Data', get:r=>fmtDateBR(r.data) },
+      { label:'Depósito 014', get:r=>(r.deposito014||0).toFixed(2) },
+      { label:'Depósito 023', get:r=>(r.deposito023||0).toFixed(2) },
+      { label:'Total', get:r=>(r.total||0).toFixed(2) },
+      { label:'Captura', get:r=>r.automatico?'Automático':'Manual' }
+    ]);
+    downloadCSV(csv, 'saldo-diario-' + todayISO() + '.csv');
+  });
+  // Verifica a cada minuto se são 16:58 (ou logo depois) e ainda não há
+  // saldo salvo para hoje; se estiver, captura sozinho. Só funciona se a
+  // administradora estiver com a página aberta nesse horário — é o único
+  // login com permissão de gravação.
+  async function tentarCapturarSaldoAutomatico(){
+    if(!isAdmin) return;
+    const now = new Date();
+    if(now.getHours() === 16 && now.getMinutes() >= 58){
+      await capturarSaldoDoDia(false);
+    }
+  }
+
   function renderBreakdown(list, containerId){
     const bySetor = {}, byDeposito = {}, custoPorSetor = {}, custoPorDeposito = {};
     list.forEach(r => {
@@ -1687,19 +1790,24 @@
       if(document.getElementById('view-cadastro').classList.contains('active')) renderSetorCatalog();
     });
 
+    watchSaldoDiario();
+
     // Recalcula a contagem de dias periodicamente e ao voltar o foco na aba,
-    // garantindo que "dias em aberto" reflita sempre a data atual.
+    // garantindo que "dias em aberto" reflita sempre a data atual. Também
+    // verifica se são 16:58 para capturar o saldo diário automaticamente.
     setInterval(() => {
       updateClock();
       const activeView = document.querySelector('.view.active').id;
       if(activeView === 'view-aberto') renderAberto();
       document.getElementById('storageBanner').classList.toggle('show', !firestoreOk);
+      tentarCapturarSaldoAutomatico();
     }, 60000);
     document.addEventListener('visibilitychange', () => {
       if(!document.hidden){
         updateClock();
         const activeView = document.querySelector('.view.active').id;
         if(activeView === 'view-aberto') renderAberto();
+        tentarCapturarSaldoAutomatico();
       }
     });
   }
