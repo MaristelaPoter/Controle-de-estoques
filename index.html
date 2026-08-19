@@ -462,6 +462,7 @@
         <p class="section-desc">Contagem de dias atualizada automaticamente com base na data de início e na data de hoje.</p>
         <div class="filter-panel">
           <div class="filter-field"><label>Buscar</label><input type="text" id="abertoKw" placeholder="código, item, setor..."></div>
+          <div class="filter-field"><label>Buscar na Descrição</label><input type="text" id="abertoDescKw" placeholder="ex.: código de item citado na descrição..."></div>
           <div class="filter-field"><label>Tipo</label><select id="abertoTipo"><option value="">Todos</option><option value="retrabalho">Retrabalho</option><option value="nc">Depósito 023</option></select></div>
           <div class="filter-field"><label>Setor</label><select id="abertoSetor"><option value="">Todos</option></select></div>
           <div class="filter-field"><label>Início de</label><input type="date" id="abertoDataDe"></div>
@@ -482,6 +483,7 @@
         <p class="section-desc">Dias totais congelados no momento da conclusão.</p>
         <div class="filter-panel">
           <div class="filter-field"><label>Buscar</label><input type="text" id="concKw" placeholder="código, item, setor..."></div>
+          <div class="filter-field"><label>Buscar na Descrição</label><input type="text" id="concDescKw" placeholder="ex.: código de item citado na descrição..."></div>
           <div class="filter-field"><label>Tipo</label><select id="concTipo"><option value="">Todos</option><option value="retrabalho">Retrabalho</option><option value="nc">Depósito 023</option></select></div>
           <div class="filter-field"><label>Setor</label><select id="concSetor"><option value="">Todos</option></select></div>
           <div class="filter-field"><label>Conclusão de</label><input type="date" id="concDataDe"></div>
@@ -1212,7 +1214,7 @@
   function editarItem(kind, id){ startEdit(kind, id); }
 
   // ================= Render: Em Aberto =================
-  let abertoFilters = { kw:'', setor:'', tipo:'', de:'', ate:'' };
+  let abertoFilters = { kw:'', descKw:'', setor:'', tipo:'', de:'', ate:'' };
   let selectedAberto = new Set();
   function combinedList(status){
     const retra = state.registros.filter(r => r.status === status)
@@ -1281,6 +1283,7 @@
     renderBreakdown(abertos, 'breakdownAberto');
 
     document.getElementById('abertoKw').value = abertoFilters.kw;
+    document.getElementById('abertoDescKw').value = abertoFilters.descKw;
     document.getElementById('abertoTipo').value = abertoFilters.tipo;
     document.getElementById('abertoSetor').value = abertoFilters.setor;
     document.getElementById('abertoDataDe').value = abertoFilters.de;
@@ -1290,11 +1293,13 @@
   function filteredAberto(){
     let list = combinedList('aberto');
     const kw = abertoFilters.kw.trim().toLowerCase();
+    const descKw = abertoFilters.descKw.trim().toLowerCase();
     if(abertoFilters.tipo) list = list.filter(r => r.kind === abertoFilters.tipo);
     if(abertoFilters.setor) list = list.filter(r => r.setor === abertoFilters.setor);
     if(abertoFilters.de) list = list.filter(r => r.dataInicio >= abertoFilters.de);
     if(abertoFilters.ate) list = list.filter(r => r.dataInicio <= abertoFilters.ate);
     if(kw) list = list.filter(r => (r.codigo+' '+r.descricaoItem+' '+r.desc+' '+r.setor).toLowerCase().includes(kw));
+    if(descKw) list = list.filter(r => r.desc.toLowerCase().includes(descKw));
     list.sort((a,b) => daysBetween(b.dataInicio, todayISO()) - daysBetween(a.dataInicio, todayISO()));
     return list;
   }
@@ -1362,6 +1367,7 @@
     updateBatchBar();
   }
   document.getElementById('abertoKw').addEventListener('input', e => { abertoFilters.kw = e.target.value; renderAbertoTable(); });
+  document.getElementById('abertoDescKw').addEventListener('input', e => { abertoFilters.descKw = e.target.value; renderAbertoTable(); });
   document.getElementById('abertoTipo').addEventListener('change', e => { abertoFilters.tipo = e.target.value; renderAbertoTable(); });
   document.getElementById('abertoSetor').addEventListener('change', e => { abertoFilters.setor = e.target.value; renderAbertoTable(); });
   document.getElementById('abertoDataDe').addEventListener('change', e => { abertoFilters.de = e.target.value; renderAbertoTable(); });
@@ -1411,15 +1417,17 @@
   document.getElementById('btnBannerBackup').addEventListener('click', exportBackup);
 
   // ================= Render: Concluídos =================
-  let concFilters = { kw:'', setor:'', tipo:'', de:'', ate:'' };
+  let concFilters = { kw:'', descKw:'', setor:'', tipo:'', de:'', ate:'' };
   function filteredConc(){
     let list = combinedList('concluido');
     const kw = concFilters.kw.trim().toLowerCase();
+    const descKw = concFilters.descKw.trim().toLowerCase();
     if(concFilters.tipo) list = list.filter(r => r.kind === concFilters.tipo);
     if(concFilters.setor) list = list.filter(r => r.setor === concFilters.setor);
     if(concFilters.de) list = list.filter(r => r.dataConclusao && r.dataConclusao >= concFilters.de);
     if(concFilters.ate) list = list.filter(r => r.dataConclusao && r.dataConclusao <= concFilters.ate);
     if(kw) list = list.filter(r => (r.codigo+' '+r.descricaoItem+' '+r.desc+' '+r.setor).toLowerCase().includes(kw));
+    if(descKw) list = list.filter(r => r.desc.toLowerCase().includes(descKw));
     list.sort((a,b) => new Date(b.dataConclusao) - new Date(a.dataConclusao));
     return list;
   }
@@ -1427,6 +1435,7 @@
     const list0 = combinedList('concluido');
     document.getElementById('nConcluidos').textContent = list0.length;
     document.getElementById('concKw').value = concFilters.kw;
+    document.getElementById('concDescKw').value = concFilters.descKw;
     document.getElementById('concTipo').value = concFilters.tipo;
     document.getElementById('concSetor').value = concFilters.setor;
     document.getElementById('concDataDe').value = concFilters.de;
@@ -1479,6 +1488,7 @@
     bindCellClamp(document.getElementById('concTableArea'));
   }
   document.getElementById('concKw').addEventListener('input', e => { concFilters.kw = e.target.value; renderConcTable(); });
+  document.getElementById('concDescKw').addEventListener('input', e => { concFilters.descKw = e.target.value; renderConcTable(); });
   document.getElementById('concTipo').addEventListener('change', e => { concFilters.tipo = e.target.value; renderConcTable(); });
   document.getElementById('concSetor').addEventListener('change', e => { concFilters.setor = e.target.value; renderConcTable(); });
   document.getElementById('concDataDe').addEventListener('change', e => { concFilters.de = e.target.value; renderConcTable(); });
