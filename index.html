@@ -157,8 +157,9 @@
   .empty-note{color:var(--ink-muted); font-size:13px; padding:30px 20px; text-align:center;}
 
   textarea.atualizacao-cell{
-    width:180px; min-width:160px; min-height:44px; resize:vertical; padding:6px 8px; border:1px solid var(--line-strong);
+    width:180px; min-width:160px; min-height:44px; resize:none; padding:6px 8px; border:1px solid var(--line-strong);
     border-radius:var(--radius-sm); font-size:12px; font-family:var(--sans); color:var(--ink); background:var(--surface);
+    overflow:hidden;
   }
   textarea.atualizacao-cell:focus{ outline:none; border-color:var(--brand);}
   textarea.atualizacao-cell.saved{ border-color:var(--good); background:var(--good-soft);}
@@ -779,8 +780,14 @@
   }
 
   // ================= Campo "Atualização" (sem histórico de texto, mas com timestamp) =================
+  function autoGrow(ta){
+    ta.style.height = 'auto';
+    ta.style.height = ta.scrollHeight + 'px';
+  }
   function bindAtualizacaoCells(container){
     container.querySelectorAll('textarea.atualizacao-cell').forEach(ta => {
+      autoGrow(ta);
+      ta.addEventListener('input', () => autoGrow(ta));
       ta.addEventListener('blur', async () => {
         if(!isAdmin) return;
         const kind = ta.dataset.kind, id = ta.dataset.id, value = ta.value.trim();
