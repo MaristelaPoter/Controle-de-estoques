@@ -133,6 +133,7 @@
   .table-wrap{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md); overflow:auto;}
   .table-wrap.scroll-limited{ max-height:360px; overflow-y:auto; }
   .table-wrap.scroll-limited thead th{ position:sticky; top:0; z-index:5; }
+  .qty-note{ font-size:10.5px; color:var(--good); font-weight:600; margin-top:2px; white-space:nowrap;}
   table{width:100%; border-collapse:collapse; font-size:12.5px; min-width:520px;}
   thead th{
     background:var(--brand-soft); color:var(--brand-deep); text-align:left; padding:10px 16px; font-size:10.5px; font-weight:700;
@@ -378,14 +379,14 @@
       <!-- ===================== NOVO REGISTRO (Retrabalho / NC 023) ===================== -->
       <div class="view active" id="view-novo">
         <h3 class="section-title">Importar Situação de Estoque (Senior)</h3>
-        <p class="section-desc">Exporte o relatório "Situação de Estoque" do Senior (.xlsx) e importe aqui. Código, Descrição, Depósito e Quantidade são preenchidos automaticamente — o Depósito 014 vira Retrabalho e o 023 vira Depósito 023. A Descrição do Retrabalho/NC fica pendente até ser preenchida na lista "Em Aberto".</p>
+        <p class="section-desc">Exporte o relatório "Situação de Estoque" do Senior (.xlsx) e importe aqui. Itens novos entram como pendentes de descrição; itens que já estão em aberto têm Quantidade e Valor Unitário atualizados automaticamente para os valores atuais do arquivo. O Depósito 014 vira Retrabalho e o 023 vira Depósito 023.</p>
         <div class="form-card" id="importCard" style="margin-bottom:28px;">
           <div class="form-row" style="margin-bottom:12px;">
             <input type="file" id="fileImportEstoque" accept=".xlsx" multiple style="display:none;">
             <button type="button" class="btn-primary" id="btnImportEstoque">Selecionar planilha(s) .xlsx</button>
             <span class="form-note" id="importEstoqueNote" style="margin-left:10px;"></span>
           </div>
-          <p class="form-note" style="margin:0;">Pode selecionar os arquivos de 014 e 023 ao mesmo tempo. Itens já em aberto (mesmo código + depósito) não são duplicados.</p>
+          <p class="form-note" style="margin:0;">Pode selecionar os arquivos de 014 e 023 ao mesmo tempo. Itens já em aberto (mesmo código + depósito) não são duplicados — têm apenas a Quantidade e o Valor Unitário atualizados.</p>
         </div>
         <h3 class="section-title" id="formTitle">Registrar Retrabalho</h3>
         <p class="section-desc">Preencha os campos abaixo. A contagem de dias em aberto começa a partir da data de início informada.</p>
@@ -762,6 +763,11 @@
 
   function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function fmtInt(n){ return new Intl.NumberFormat('pt-BR').format(n||0); }
+  function qtyNoteHtml(r){
+    if(!r.pecasFinalizadas) return '';
+    const n = r.pecasFinalizadas;
+    return '<div class="qty-note admin-only">'+fmtInt(n)+' peça'+(n===1?'':'s')+' finalizada'+(n===1?'':'s')+'</div>';
+  }
   function fmtBRL(n){ return n==null ? '—' : new Intl.NumberFormat('pt-BR', { style:'currency', currency:'BRL' }).format(n); }
   function toast(msg){
     const t = document.getElementById('toast');
@@ -954,7 +960,7 @@
       toast('Não foi possível carregar o leitor de planilhas. Verifique sua conexão e tente novamente.');
       return;
     }
-    let totalNovos = 0, totalDuplicados = 0, totalIgnorados = 0, arquivosInvalidos = [];
+    let totalNovos = 0, totalAtualizados = 0, totalSemAlteracao = 0, totalIgnorados = 0, arquivosInvalidos = [];
     let precisaSetor = false;
 
     for(const file of files){
@@ -984,14 +990,35 @@
         const depRow = String(row[6]||deposito||'').trim() || deposito;
         const valEstoque = parseNumeroSenior(row[7]);
         const qtd = parseNumeroSenior(row[8]);
+        if(qtd == null){ totalIgnorados++; continue; }
+        const valorUnitario = (qtd > 0 && valEstoque != null) ? +(valEstoque/qtd).toFixed(4) : null;
         const kind = depRow === '023' ? 'nc' : 'retrabalho';
         const list = kind === 'nc' ? state.ncRegistros : state.registros;
 
-        const jaExiste = list.some(r => r.status === 'aberto' && r.codigo.toLowerCase() === codigo.toLowerCase() && r.deposito === depRow);
-        if(jaExiste){ totalDuplicados++; continue; }
-        if(qtd == null){ totalIgnorados++; continue; }
-
-        const valorUnitario = (qtd > 0 && valEstoque != null) ? +(valEstoque/qtd).toFixed(4) : null;
+        const existente = list.find(r => r.status === 'aberto' && r.codigo.toLowerCase() === codigo.toLowerCase() && r.deposito === depRow);
+        if(existente){
+          const mudouQtd = existente.quantidade !== qtd;
+          const mudouValor = existente.valorUnitario !== valorUnitario;
+          if(mudouQtd || mudouValor){
+            const partesMudanca = [];
+            if(mudouQtd) partesMudanca.push('Qtde. '+fmtInt(existente.quantidade)+' → '+fmtInt(qtd));
+            if(mudouValor) partesMudanca.push('Valor Unit. '+fmtBRL(existente.valorUnitario)+' → '+fmtBRL(valorUnitario));
+            pushHistory(existente, 'Valores atualizados via Situação de Estoque ('+partesMudanca.join(', ')+')');
+            if(mudouQtd && qtd < existente.quantidade){
+              existente.pecasFinalizadas = existente.quantidade - qtd;
+              existente.pecasFinalizadasEm = new Date().toISOString();
+            } else if(mudouQtd){
+              existente.pecasFinalizadas = null;
+              existente.pecasFinalizadasEm = null;
+            }
+            existente.quantidade = qtd;
+            existente.valorUnitario = valorUnitario;
+            totalAtualizados++;
+          } else {
+            totalSemAlteracao++;
+          }
+          continue;
+        }
 
         const existingItem = state.itens.find(it => it.codigo.toLowerCase() === codigo.toLowerCase());
         if(!existingItem){
@@ -1019,15 +1046,19 @@
       renderSetorSelect();
     }
     await persistItens(); await persistRegistros(); await persistNcRegistros();
-    renderDatalist(); renderCounts(); renderAberto();
+    renderDatalist(); renderCounts(); renderAberto(); renderPendentes();
 
     const partes = [];
     if(totalNovos) partes.push(totalNovos+' item(ns) importado(s)');
-    if(totalDuplicados) partes.push(totalDuplicados+' já em aberto (ignorado(s))');
+    if(totalAtualizados) partes.push(totalAtualizados+' atualizado(s) (qtde./valor)');
+    if(totalSemAlteracao) partes.push(totalSemAlteracao+' já em aberto (sem alteração)');
     if(totalIgnorados) partes.push(totalIgnorados+' sem quantidade válida (ignorado(s))');
     if(arquivosInvalidos.length) partes.push('formato não reconhecido: '+arquivosInvalidos.join(', '));
     document.getElementById('importEstoqueNote').textContent = partes.length ? partes.join(' · ') : 'Nada para importar.';
-    toast(totalNovos ? (totalNovos+' item(ns) importado(s) — preencha a descrição em "Em Aberto".') : 'Nenhum item novo importado.');
+    const msgs = [];
+    if(totalNovos) msgs.push(totalNovos+' novo(s)');
+    if(totalAtualizados) msgs.push(totalAtualizados+' atualizado(s)');
+    toast(msgs.length ? (msgs.join(' e ')+' — confira em "Em Aberto".') : 'Nenhuma novidade: tudo já estava em dia.');
   }
   document.getElementById('btnImportEstoque').addEventListener('click', () => document.getElementById('fileImportEstoque').click());
   document.getElementById('fileImportEstoque').addEventListener('change', async e => {
@@ -1107,7 +1138,7 @@
         '<td><span class="badge '+(r.kind==='nc'?'dias-atencao':'dias-ok')+'">'+esc(r.tipoLabel)+'</span></td><td style="font-family:var(--mono);">'+esc(r.deposito||'—')+'</td><td>'+esc(r.setor)+'</td><td style="font-family:var(--mono);">'+esc(r.codigo)+'</td>' +
         '<td><div class="cell-clamp" data-label="Descrição do Item" title="'+esc(r.descricaoItem)+'">'+esc(r.descricaoItem)+'</div></td>' +
         '<td>'+(r.desc ? '<div class="cell-clamp" data-label="Descrição" title="'+esc(r.desc)+'">'+esc(r.desc)+'</div>' : '<span class="badge dias-atencao">Aguardando descrição</span>')+'</td>' +
-        '<td class="num">'+(r.quantidade!=null?fmtInt(r.quantidade):'—')+'</td>' +
+        '<td class="num">'+(r.quantidade!=null?fmtInt(r.quantidade):'—')+qtyNoteHtml(r)+'</td>' +
         '<td class="num">'+fmtBRL(r.valorUnitario!=null && r.quantidade!=null ? r.valorUnitario*r.quantidade : null)+'</td>' +
         '<td>'+fmtDateBR(r.dataInicio)+'</td>' +
         '<td><span class="badge '+diasBadgeClass(dias)+'">'+dias+' dia'+(dias===1?'':'s')+'</span></td>' +
@@ -1349,7 +1380,7 @@
         editing = true;
         const reg = state.registros.find(r => r.id === state.editingId);
         if(reg){
-          Object.assign(reg, { deposito, setor, codigo, descricaoItem, descricaoRetrabalho: descricao, quantidade, valorUnitario, dataInicio, atualizacao });
+          Object.assign(reg, { deposito, setor, codigo, descricaoItem, descricaoRetrabalho: descricao, quantidade, valorUnitario, dataInicio, atualizacao, pecasFinalizadas: null, pecasFinalizadasEm: null });
           pushHistory(reg, 'Registro atualizado');
         }
         state.editingId = null;
@@ -1367,7 +1398,7 @@
         editing = true;
         const reg = state.ncRegistros.find(r => r.id === state.editingNcId);
         if(reg){
-          Object.assign(reg, { deposito, setor, codigo, descricaoItem, descricaoNC: descricao, quantidade, valorUnitario, dataInicio, atualizacao });
+          Object.assign(reg, { deposito, setor, codigo, descricaoItem, descricaoNC: descricao, quantidade, valorUnitario, dataInicio, atualizacao, pecasFinalizadas: null, pecasFinalizadasEm: null });
           if(fotoAtualBase64) reg.foto = fotoAtualBase64;
           pushHistory(reg, 'Registro atualizado');
         }
@@ -1748,7 +1779,7 @@
         '<td><span class="badge '+(r.kind==='nc'?'dias-atencao':'dias-ok')+'">'+esc(r.tipoLabel)+'</span></td><td style="font-family:var(--mono);">'+esc(r.deposito||'—')+'</td><td>'+esc(r.setor)+'</td><td style="font-family:var(--mono);">'+esc(r.codigo)+'</td>' +
         '<td><div class="cell-clamp" data-label="Descrição do Item" title="'+esc(r.descricaoItem)+'">'+esc(r.descricaoItem)+'</div></td>' +
         '<td>'+(r.desc ? '<div class="cell-clamp" data-label="Descrição" title="'+esc(r.desc)+'">'+esc(r.desc)+'</div>' : '<span class="badge dias-atencao" title="Importado da Situação de Estoque — clique em Editar para preencher">Aguardando descrição</span>')+'</td>' +
-        '<td class="num">'+(r.quantidade!=null?fmtInt(r.quantidade):'—')+'</td>' +
+        '<td class="num">'+(r.quantidade!=null?fmtInt(r.quantidade):'—')+qtyNoteHtml(r)+'</td>' +
         '<td class="num">'+fmtBRL(r.valorUnitario!=null && r.quantidade!=null ? r.valorUnitario*r.quantidade : null)+'</td>' +
         '<td>'+fmtDateBR(r.dataInicio)+'</td>' +
         '<td><span class="badge '+diasBadgeClass(dias)+'">'+dias+' dia'+(dias===1?'':'s')+'</span></td>' +
@@ -1832,7 +1863,7 @@
       return '<tr>' +
         '<td><span class="badge '+(r.kind==='nc'?'dias-atencao':'dias-ok')+'">'+esc(r.tipoLabel)+'</span></td><td style="font-family:var(--mono);">'+esc(r.deposito||'—')+'</td><td>'+esc(r.setor)+'</td><td style="font-family:var(--mono);">'+esc(r.codigo)+'</td>' +
         '<td><div class="cell-clamp" data-label="Descrição do Item" title="'+esc(r.descricaoItem)+'">'+esc(r.descricaoItem)+'</div></td>' +
-        '<td class="num">'+(r.quantidade!=null?fmtInt(r.quantidade):'—')+'</td>' +
+        '<td class="num">'+(r.quantidade!=null?fmtInt(r.quantidade):'—')+qtyNoteHtml(r)+'</td>' +
         '<td class="num">'+fmtBRL(r.valorUnitario!=null && r.quantidade!=null ? r.valorUnitario*r.quantidade : null)+'</td>' +
         '<td>'+fmtDateBR(r.dataInicio)+'</td>' +
         '<td><span class="badge '+diasBadgeClass(dias)+'">'+dias+' dia'+(dias===1?'':'s')+'</span></td>' +
