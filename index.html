@@ -502,6 +502,15 @@
         <div class="breakdown-grid" id="breakdownAberto"><div class="breakdown-card"><h4>Em aberto por setor</h4><div class="bar-row"><span class="bar-label" title="Unidade 1">Unidade 1</span><span class="bar-track"><span class="bar-fill" style="width:100%"></span></span><span class="bar-val">20</span></div><div class="bar-row"><span class="bar-label" title="Em avaliação">Em avaliação</span><span class="bar-track"><span class="bar-fill" style="width:75%"></span></span><span class="bar-val">15</span></div><div class="bar-row"><span class="bar-label" title="Apoio 3">Apoio 3</span><span class="bar-track"><span class="bar-fill" style="width:25%"></span></span><span class="bar-val">5</span></div><div class="bar-row"><span class="bar-label" title="Apoio B203">Apoio B203</span><span class="bar-track"><span class="bar-fill" style="width:20%"></span></span><span class="bar-val">4</span></div><div class="bar-row"><span class="bar-label" title="Engenharia">Engenharia</span><span class="bar-track"><span class="bar-fill" style="width:5%"></span></span><span class="bar-val">1</span></div><div class="bar-row"><span class="bar-label" title="Extrusora">Extrusora</span><span class="bar-track"><span class="bar-fill" style="width:5%"></span></span><span class="bar-val">1</span></div><div class="bar-row"><span class="bar-label" title="Potência">Potência</span><span class="bar-track"><span class="bar-fill" style="width:5%"></span></span><span class="bar-val">1</span></div></div><div class="breakdown-card"><h4>Em aberto por depósito</h4><div class="bar-row"><span class="bar-label">Depósito 014</span><span class="bar-track"><span class="bar-fill" style="width:100%"></span></span><span class="bar-val">41</span></div><div class="bar-row"><span class="bar-label">Depósito 023</span><span class="bar-track"><span class="bar-fill" style="width:14.634146341463413%"></span></span><span class="bar-val">6</span></div></div><div class="breakdown-card"><h4>Custo por setor</h4><div class="bar-row"><span class="bar-label" title="Unidade 1">Unidade 1</span><span class="bar-track"><span class="bar-fill" style="width:100%"></span></span><span class="bar-val" style="width:auto; font-size:11px;">R$&nbsp;107.821,78</span></div><div class="bar-row"><span class="bar-label" title="Apoio 3">Apoio 3</span><span class="bar-track"><span class="bar-fill" style="width:35.384270228148715%"></span></span><span class="bar-val" style="width:auto; font-size:11px;">R$&nbsp;38.151,95</span></div><div class="bar-row"><span class="bar-label" title="Em avaliação">Em avaliação</span><span class="bar-track"><span class="bar-fill" style="width:27.243280532003826%"></span></span><span class="bar-val" style="width:auto; font-size:11px;">R$&nbsp;29.374,19</span></div><div class="bar-row"><span class="bar-label" title="Potência">Potência</span><span class="bar-track"><span class="bar-fill" style="width:18.714762453374444%"></span></span><span class="bar-val" style="width:auto; font-size:11px;">R$&nbsp;20.178,59</span></div><div class="bar-row"><span class="bar-label" title="Engenharia">Engenharia</span><span class="bar-track"><span class="bar-fill" style="width:11.311480852940841%"></span></span><span class="bar-val" style="width:auto; font-size:11px;">R$&nbsp;12.196,24</span></div><div class="bar-row"><span class="bar-label" title="Extrusora">Extrusora</span><span class="bar-track"><span class="bar-fill" style="width:3.729320736496837%"></span></span><span class="bar-val" style="width:auto; font-size:11px;">R$&nbsp;4.021,02</span></div><div class="bar-row"><span class="bar-label" title="Apoio B203">Apoio B203</span><span class="bar-track"><span class="bar-fill" style="width:2.887820994978936%"></span></span><span class="bar-val" style="width:auto; font-size:11px;">R$&nbsp;3.113,70</span></div></div><div class="breakdown-card"><h4>Custo por depósito</h4><div class="bar-row"><span class="bar-label">Depósito 014</span><span class="bar-track"><span class="bar-fill" style="width:100%"></span></span><span class="bar-val" style="width:auto; font-size:11px;">R$&nbsp;201.912,73</span></div><div class="bar-row"><span class="bar-label">Depósito 023</span><span class="bar-track"><span class="bar-fill" style="width:6.411056895719251%"></span></span><span class="bar-val" style="width:auto; font-size:11px;">R$&nbsp;12.944,74</span></div></div></div>
         <h3 class="section-title">Retrabalhos em Aberto <span class="n" id="nAberto">47</span></h3>
         <p class="section-desc">Contagem de dias atualizada automaticamente com base na data de início e na data de hoje.</p>
+        <div class="form-card" id="compareCard" style="margin-bottom:20px;">
+          <div class="form-row" style="margin-bottom:10px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <input type="file" id="fileCompareEstoque" accept=".xlsx" multiple style="display:none;">
+            <button type="button" class="btn-ghost" id="btnCompareEstoque">Comparar com Situação de Estoque atual</button>
+            <span class="form-note" id="compareNote"></span>
+          </div>
+          <p class="form-note" style="margin:0;">Envie o(s) arquivo(s) .xlsx atualizado(s) do Senior (014 e/ou 023). O painel mostra os retrabalhos em aberto desse(s) depósito(s) cujo item já não aparece mais no estoque — provavelmente já foram consumidos, mas o registro ainda não foi concluído.</p>
+          <div id="compareResultsArea"></div>
+        </div>
         <div class="filter-panel">
           <div class="filter-field"><label>Buscar</label><input type="text" id="abertoKw" placeholder="código, item, setor..."></div>
           <div class="filter-field"><label>Buscar na Descrição</label><input type="text" id="abertoDescKw" placeholder="ex.: código de item citado na descrição..."></div>
@@ -1026,6 +1035,106 @@
     if(!files.length || !isAdmin) return;
     document.getElementById('importEstoqueNote').textContent = 'Importando...';
     await importEstoqueFiles(files);
+    e.target.value = '';
+  });
+
+  // ================= Comparar com Estoque Atual (itens já consumidos) =================
+  let compareState = { list: [], depositosCobertos: [], arquivosInvalidos: [] };
+  async function compareComEstoque(files){
+    if(typeof XLSX === 'undefined'){
+      toast('Não foi possível carregar o leitor de planilhas. Verifique sua conexão e tente novamente.');
+      return;
+    }
+    const itensPorDeposito = {}; // depósito -> Set de códigos (minúsculo) ainda presentes no estoque
+    const arquivosInvalidos = [];
+
+    for(const file of files){
+      let rows;
+      try{
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, { type: 'array' });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+      }catch(e){
+        arquivosInvalidos.push(file.name);
+        continue;
+      }
+      let deposito = null, headerFound = false, encontrouCabecalho = false;
+      for(let i=0;i<rows.length;i++){
+        const row = rows[i] || [];
+        const c0 = String(row[0]||'').trim();
+        const c1 = String(row[1]||'').trim();
+        if(c0 === 'Cód.' && c1 === 'Produto'){ headerFound = true; encontrouCabecalho = true; continue; }
+        if(c0 === 'Depósito:'){ deposito = c1; continue; }
+        if(!headerFound || !deposito || !c0) continue;
+        const codigo = c0;
+        const produto = c1;
+        if(!produto) continue;
+        const depRow = String(row[6]||deposito||'').trim() || deposito;
+        const qtd = parseNumeroSenior(row[8]);
+        if(qtd == null) continue;
+        if(!itensPorDeposito[depRow]) itensPorDeposito[depRow] = new Set();
+        itensPorDeposito[depRow].add(codigo.toLowerCase());
+      }
+      if(!encontrouCabecalho) arquivosInvalidos.push(file.name);
+    }
+
+    const depositosCobertos = Object.keys(itensPorDeposito);
+    if(!depositosCobertos.length){
+      document.getElementById('compareNote').textContent = arquivosInvalidos.length ? ('Formato não reconhecido: '+arquivosInvalidos.join(', ')) : 'Nenhum depósito identificado no(s) arquivo(s).';
+      document.getElementById('compareResultsArea').innerHTML = '';
+      return;
+    }
+    const abertos = combinedList('aberto').filter(r => depositosCobertos.includes(r.deposito));
+    const divergentes = abertos.filter(r => !itensPorDeposito[r.deposito].has(r.codigo.toLowerCase()));
+    divergentes.sort((a,b) => daysBetween(b.dataInicio, todayISO()) - daysBetween(a.dataInicio, todayISO()));
+
+    compareState = { list: divergentes, depositosCobertos, arquivosInvalidos };
+    renderCompareResults();
+  }
+  function renderCompareResults(){
+    const { list, depositosCobertos, arquivosInvalidos } = compareState;
+    const notaArquivos = arquivosInvalidos.length ? ' · arquivo(s) não reconhecido(s): '+arquivosInvalidos.join(', ') : '';
+    document.getElementById('compareNote').textContent = 'Comparado com depósito(s) '+depositosCobertos.join(', ')+notaArquivos+'.';
+    const area = document.getElementById('compareResultsArea');
+    if(!list.length){
+      area.innerHTML = '<div class="empty-note">Nenhuma divergência encontrada — todos os itens em aberto desse(s) depósito(s) ainda constam no estoque atual.</div>';
+      return;
+    }
+    const rows = list.map(r => {
+      const dias = daysBetween(r.dataInicio, todayISO());
+      return '<tr>' +
+        '<td><span class="badge '+(r.kind==='nc'?'dias-atencao':'dias-ok')+'">'+esc(r.tipoLabel)+'</span></td><td style="font-family:var(--mono);">'+esc(r.deposito||'—')+'</td><td>'+esc(r.setor)+'</td><td style="font-family:var(--mono);">'+esc(r.codigo)+'</td>' +
+        '<td><div class="cell-clamp" data-label="Descrição do Item" title="'+esc(r.descricaoItem)+'">'+esc(r.descricaoItem)+'</div></td>' +
+        '<td>'+(r.desc ? '<div class="cell-clamp" data-label="Descrição" title="'+esc(r.desc)+'">'+esc(r.desc)+'</div>' : '<span class="badge dias-atencao">Aguardando descrição</span>')+'</td>' +
+        '<td class="num">'+(r.quantidade!=null?fmtInt(r.quantidade):'—')+'</td>' +
+        '<td class="num">'+fmtBRL(r.valorUnitario!=null && r.quantidade!=null ? r.valorUnitario*r.quantidade : null)+'</td>' +
+        '<td>'+fmtDateBR(r.dataInicio)+'</td>' +
+        '<td><span class="badge '+diasBadgeClass(dias)+'">'+dias+' dia'+(dias===1?'':'s')+'</span></td>' +
+        '<td class="row-actions"><button class="ok-btn" data-act="concluir" data-kind="'+r.kind+'" data-id="'+r.id+'">Concluir</button><button class="edit-btn" data-act="editar" data-kind="'+r.kind+'" data-id="'+r.id+'">Editar</button></td></tr>';
+    }).join('');
+    area.innerHTML = '<div class="form-note" style="margin:6px 0 10px; color:var(--priority); font-weight:600;">'+list.length+' item(ns) em aberto não encontrados no estoque atual — provavelmente já foram consumidos/finalizados.</div>' +
+      '<div class="table-wrap scroll-limited"><table><thead><tr><th>Tipo</th><th>Depósito</th><th>Setor</th><th>Código</th><th>Item</th><th>Descrição</th><th class="num">Qtde.</th><th class="num">Valor Total</th><th>Início</th><th>Dias em Aberto</th><th>Ações</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+    area.querySelectorAll('button[data-act]').forEach(b => {
+      b.addEventListener('click', async () => {
+        const id = b.dataset.id, kind = b.dataset.kind;
+        if(b.dataset.act === 'concluir'){
+          await concluirItem(kind, id);
+          compareState.list = compareState.list.filter(r => !(r.kind === kind && r.id === id));
+          renderCompareResults();
+        } else if(b.dataset.act === 'editar'){
+          editarItem(kind, id);
+        }
+      });
+    });
+    bindCellClamp(area);
+  }
+  document.getElementById('btnCompareEstoque').addEventListener('click', () => document.getElementById('fileCompareEstoque').click());
+  document.getElementById('fileCompareEstoque').addEventListener('change', async e => {
+    const files = Array.from(e.target.files || []);
+    if(!files.length) return;
+    document.getElementById('compareNote').textContent = 'Comparando...';
+    await compareComEstoque(files);
     e.target.value = '';
   });
 
