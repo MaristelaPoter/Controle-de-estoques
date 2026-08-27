@@ -75,6 +75,13 @@
   .folder-card .folder-name{ font-weight:700; font-size:13.5px; color:var(--ink);}
   .folder-card .folder-count{ font-size:11.5px; color:var(--ink-muted); font-family:var(--mono);}
 
+  .charts-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:18px;}
+  @media(max-width:900px){ .charts-grid{ grid-template-columns:1fr;} }
+  .chart-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md); padding:16px 18px;}
+  .chart-card-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px;}
+  .chart-card-head h4{ margin:0; font-size:13.5px; color:var(--ink); font-weight:700;}
+  .chart-canvas-wrap{ position:relative; height:240px;}
+
   .page-content{ padding:24px 32px 80px; max-width:1240px; width:100%;}
 
   .view{display:none;}
@@ -555,6 +562,16 @@
           <button type="button" class="btn-danger" id="btnResetSaldo" style="margin-left:auto;">Resetar Saldo Diário</button>
           <span class="form-note" id="saldoNote"></span>
         </div>
+        <div class="charts-grid">
+          <div class="chart-card">
+            <div class="chart-card-head"><h4>Depósito 014</h4></div>
+            <div class="chart-canvas-wrap"><canvas id="chartSaldo014"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card-head"><h4>Depósito 023</h4><span class="badge dias-atencao">Meta: R$ 350,00/dia</span></div>
+            <div class="chart-canvas-wrap"><canvas id="chartSaldo023"></canvas></div>
+          </div>
+        </div>
         <p class="section-desc" style="margin-top:4px;">Mostrando apenas o mês atual. Meses anteriores ficam organizados em pastas logo abaixo.</p>
         <div id="saldoTableArea"><div class="table-wrap"><table><thead><tr><th>Data</th><th class="num">Depósito 014</th><th class="num">Depósito 023</th><th class="num">Total</th><th>Captura</th></tr></thead><tbody></tbody></table></div></div>
         <div id="saldoFoldersArea"></div>
@@ -642,6 +659,7 @@
 </div>
 
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script type="module">
   // ================= Firebase (sincronização compartilhada) =================
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
@@ -1596,6 +1614,57 @@
     modalActions.appendChild(btnClose);
     modalBackdrop.classList.add('show');
   }
+  const META_DEPOSITO_023 = 350;
+  let chartSaldo014 = null, chartSaldo023 = null;
+  function renderSaldoCharts(diasAtualAsc){
+    if(typeof Chart === 'undefined') return;
+    const canvas014 = document.getElementById('chartSaldo014');
+    const canvas023 = document.getElementById('chartSaldo023');
+    if(!canvas014 || !canvas023) return;
+
+    const labels = diasAtualAsc.map(d => fmtDateBR(d).slice(0,5));
+    const dados014 = diasAtualAsc.map(d => saldoCache[d].deposito014 || 0);
+    const dados023 = diasAtualAsc.map(d => saldoCache[d].deposito023 || 0);
+
+    if(chartSaldo014) chartSaldo014.destroy();
+    chartSaldo014 = new Chart(canvas014.getContext('2d'), {
+      type: 'line',
+      data: { labels, datasets: [{
+        label: 'Custo Total', data: dados014,
+        borderColor: '#0B3F27', backgroundColor: 'rgba(11,63,39,0.08)',
+        fill: true, tension: 0.25, pointRadius: 3, pointBackgroundColor: '#0B3F27'
+      }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => fmtBRL(ctx.parsed.y) } } },
+        scales: { y: { beginAtZero: true, ticks: { callback: v => fmtBRL(v) } } }
+      }
+    });
+
+    if(chartSaldo023) chartSaldo023.destroy();
+    chartSaldo023 = new Chart(canvas023.getContext('2d'), {
+      type: 'line',
+      data: { labels, datasets: [
+        {
+          label: 'Custo Total', data: dados023,
+          borderColor: '#88471E', backgroundColor: 'rgba(136,71,30,0.08)',
+          fill: true, tension: 0.25, pointRadius: 3, pointBackgroundColor: '#88471E'
+        },
+        {
+          label: 'Meta ('+fmtBRL(META_DEPOSITO_023)+')', data: labels.map(() => META_DEPOSITO_023),
+          borderColor: '#B23B3B', borderDash: [6,4], borderWidth: 2, pointRadius: 0, fill: false
+        }
+      ] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: true, position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+          tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmtBRL(ctx.parsed.y) } }
+        },
+        scales: { y: { beginAtZero: true, ticks: { callback: v => fmtBRL(v) } } }
+      }
+    });
+  }
   function renderSaldoDiario(){
     const todos = Object.keys(saldoCache).sort().reverse();
     document.getElementById('nSaldo').textContent = todos.length;
@@ -1609,6 +1678,7 @@
       const rows = diasAtual.map(d => saldoRowHtml(d)).join('');
       document.getElementById('saldoTableArea').innerHTML = '<div class="table-wrap scroll-limited"><table><thead><tr><th>Data</th><th class="num">Depósito 014</th><th class="num">Depósito 023</th><th class="num">Total</th><th>Captura</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
     }
+    renderSaldoCharts([...diasAtual].reverse());
 
     const porMes = {};
     diasAnteriores.forEach(d => { const k = saldoMonthKey(d); (porMes[k] = porMes[k] || []).push(d); });
