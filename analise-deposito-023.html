@@ -1,0 +1,1997 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Análise Cruzada - Depósito 023</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1B211D;
+    --ink-muted:#5C6660;
+    --ink-faint:#8B948E;
+    --paper:#F7F8F5;
+    --surface:#FFFFFF;
+    --line:#E2E5DF;
+    --line-strong:#CDD3CC;
+    --brand:#0F5C3A;
+    --brand-deep:#0B3F27;
+    --brand-soft:#E8F1EC;
+    --brand-text:#0C7A4C; /* variante mais escura da marca, só para uso em texto — contraste AA garantido sobre branco */
+    --priority:#B8471E;
+    --priority-soft:#F7E9E2;
+    --good:#1F7A4D;
+    --good-soft:#E7F2EC;
+    --pending:#946B1F;
+    --pending-soft:#F3ECDE;
+    --info:#2456C7;
+    --info-soft:#E7EDFB;
+    --radius-sm:6px;
+    --radius-md:8px;
+    --mono:'IBM Plex Mono', ui-monospace, "SFMono-Regular", Consolas, monospace;
+    --sans:'Inter', -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--paper);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;}
+  body{font-size:14px;}
+  .hidden{display:none !important;}
+  :focus-visible{outline:2px solid var(--brand); outline-offset:2px;}
+
+  /* ---------- Shell / Sidebar / Topbar ---------- */
+  .shell{display:grid; grid-template-columns:236px 1fr; min-height:100vh;}
+  aside.sidebar{
+    background:var(--brand-deep); border-right:1px solid var(--brand-deep);
+    display:flex; flex-direction:column; padding:20px 14px; position:sticky; top:0; height:100vh; z-index:60;
+  }
+  .brandmark{ display:flex; align-items:center; gap:10px; padding:6px 8px 22px; border-bottom:1px solid rgba(255,255,255,.14); margin-bottom:16px;}
+  .brandmark .seal{width:34px; height:34px; border-radius:50%; border:2px solid rgba(255,255,255,.55); display:flex; align-items:center; justify-content:center; font-weight:800; font-style:italic; color:#fff; font-size:15px; flex:none; background:rgba(255,255,255,.08);}
+  .brandmark .names{ line-height:1.25;}
+  .brandmark .names b{ font-size:13.5px; font-weight:700; letter-spacing:-.01em; display:block; color:#fff;}
+  .brandmark .names span{ font-size:11px; color:#A9D6BE;}
+
+  nav.navlist{ display:flex; flex-direction:column; gap:2px; flex:1;}
+  nav.navlist button.tab-btn{
+    all:unset; box-sizing:border-box; cursor:pointer;
+    display:flex; align-items:center; gap:10px; padding:10px 10px; border-radius:var(--radius-sm);
+    color:#BFE1CE; font-size:13.5px; font-weight:500; font-family:var(--sans); margin:0;
+  }
+  nav.navlist button.tab-btn svg{ width:17px; height:17px; flex:none; opacity:.85;}
+  nav.navlist button.tab-btn.active{ background:rgba(255,255,255,.14); color:#fff; font-weight:600; box-shadow:inset 3px 0 0 #6FCF9A;}
+  nav.navlist button.tab-btn.active svg{ opacity:1;}
+  nav.navlist button.tab-btn:not(.active):hover{ background:rgba(255,255,255,.08); color:#fff;}
+
+  .sidebar-foot{ border-top:1px solid rgba(255,255,255,.14); padding-top:14px; margin-top:10px; font-size:11px; color:#9FCBB2; line-height:1.5;}
+
+  main{ display:flex; flex-direction:column; min-width:0;}
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between; gap:16px;
+    padding:16px 32px; border-bottom:1px solid var(--line); background:var(--surface);
+    position:sticky; top:0; z-index:50; flex-wrap:wrap;
+  }
+  .topbar .title h1{ margin:0; font-size:16px; font-weight:700; color:var(--ink);}
+  .topbar .title p{ margin:2px 0 0; font-size:12px; color:var(--ink-muted);}
+  .header-meta{font-family:var(--mono); font-size:11.5px; color:var(--ink-muted); line-height:1.5; text-align:right; white-space:nowrap;}
+
+  .page-content{ padding:24px 32px 80px; max-width:1280px; width:100%;}
+
+  button{font-family:var(--sans); cursor:pointer; border:none; border-radius:var(--radius-sm); font-weight:600; transition:.12s ease;}
+  .btn-primary{
+    background:var(--brand); color:#fff; border:none; border-radius:var(--radius-md);
+    padding:13px 32px; font-size:14.5px; font-weight:700; letter-spacing:.2px; cursor:pointer;
+  }
+  .btn-primary:hover:not(:disabled){background:var(--brand-deep);}
+  .btn-primary:active:not(:disabled){transform:translateY(1px);}
+  .btn-primary:disabled{background:var(--line-strong); color:var(--ink-faint); cursor:not-allowed;}
+  .btn-secondary{background:var(--surface); color:var(--ink); border:1px solid var(--line-strong); border-radius:var(--radius-sm); padding:9px 16px; font-size:13px; font-weight:600;}
+  .btn-secondary:hover{border-color:var(--brand); color:var(--brand-text);}
+  .btn-select{
+    margin-top:8px; background:var(--ink); color:#fff; border:none; border-radius:var(--radius-sm);
+    padding:9px 16px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:7px;
+  }
+  .btn-select:hover{background:#000;}
+  .btn-select svg{width:14px; height:14px;}
+  .btn-export{
+    background:var(--surface); border:1px solid var(--line-strong); border-radius:var(--radius-sm); padding:9px 14px;
+    font-size:13px; font-weight:600; display:flex; align-items:center; gap:7px; color:var(--ink);
+  }
+  .btn-export:hover{border-color:var(--brand); color:var(--brand-text);}
+  .btn-export svg{width:14px; height:14px;}
+
+  /* ---------- Section titles ---------- */
+  .section-title{ display:flex; align-items:baseline; gap:10px; margin:34px 0 16px;}
+  .section-title .idx{ font-family:var(--mono); font-size:11px; color:#fff; background:var(--brand); border-radius:5px; padding:2px 7px; font-weight:700;}
+  .section-title h2{ font-size:15px; margin:0; font-weight:700; color:var(--ink);}
+  .section-title .sub{ color:var(--ink-muted); font-size:12.5px;}
+  .page-content > .section-title:first-of-type{margin-top:6px;}
+
+  /* ---------- Upload cards ---------- */
+  .upload-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:16px;}
+  .upload-card{
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md);
+    padding:20px; display:flex; flex-direction:column; align-items:flex-start; gap:8px;
+    border-top:3px solid var(--brand);
+  }
+  .upload-card .upload-icon{width:26px; height:26px; color:var(--brand);}
+  .upload-card h3{margin:0; font-size:14.5px; font-weight:700; color:var(--ink);}
+  .upload-card .upload-desc{margin:0; font-size:12.5px; color:var(--ink-muted);}
+  .upload-status{ margin-top:4px; font-size:12.5px; font-family:var(--mono); line-height:1.5; word-break:break-word; display:flex; align-items:flex-start; gap:6px;}
+  .upload-status svg{width:13px; height:13px; flex:none; margin-top:2px;}
+  .upload-status.state-success{color:var(--good);}
+  .upload-status.state-error{color:var(--priority);}
+  .upload-status.state-loading{color:var(--ink-muted);}
+  .upload-card.is-success{border-top-color:var(--good);}
+  .upload-card.is-error{border-top-color:var(--priority);}
+  .btn-execute-row{display:flex; justify-content:center; margin-top:22px;}
+
+  /* ---------- Responsible field ---------- */
+  .responsible-row{max-width:420px; margin:20px auto 0;}
+  .responsible-row label{display:block; font-size:10.5px; font-weight:700; color:var(--ink-muted); margin-bottom:4px; text-transform:uppercase; letter-spacing:.4px;}
+  .responsible-row input{width:100%; padding:9px 12px; border:1px solid var(--line); border-radius:var(--radius-sm); font-size:13.5px; font-family:var(--sans);}
+  .responsible-row input:focus{outline:2px solid var(--brand); outline-offset:1px; border-color:var(--brand);}
+
+  /* ---------- Historic banner ---------- */
+  .historic-banner{
+    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+    background:var(--brand-soft); border:1px solid var(--line); color:var(--ink);
+    border-radius:var(--radius-md); padding:12px 16px; margin-bottom:18px; font-size:13.5px;
+  }
+  .historic-banner strong{color:var(--brand-text);}
+  .historic-banner .btn-secondary{margin-left:auto;}
+
+  /* ---------- History list ---------- */
+  .history-mode-note{ font-size:12px; font-weight:600; padding:7px 12px; border-radius:8px; margin-bottom:14px; display:inline-flex; align-items:center; gap:6px;}
+  .history-mode-note.mode-ok{ background:var(--good-soft); color:var(--good); border:1px solid var(--good);}
+  .history-mode-note.mode-warn{ background:var(--pending-soft); color:var(--pending); border:1px solid var(--pending);}
+  .history-search-note{ background:var(--pending-soft); color:var(--pending); border:1px solid var(--pending); border-radius:8px; padding:8px 14px; font-size:12.5px; margin-top:12px; font-weight:600;}
+  .history-note{font-size:12.5px; color:var(--ink-muted); margin-top:10px; text-align:right;}
+  .history-actions{display:flex; gap:6px; flex-wrap:wrap;}
+  .history-actions button{ background:var(--surface); border:1px solid var(--line-strong); border-radius:6px; padding:5px 9px; font-size:11.5px; font-weight:600; cursor:pointer; color:var(--ink); display:inline-flex; align-items:center; gap:4px;}
+  .history-actions button svg{width:12px; height:12px;}
+  .history-actions button:hover{border-color:var(--brand); color:var(--brand-text);}
+  .history-actions button.danger{color:var(--priority); border-color:var(--priority-soft);}
+  .history-actions button.danger:hover{background:var(--priority-soft); border-color:var(--priority);}
+  .history-empty{padding:50px 20px; text-align:center; color:var(--ink-muted); font-size:14px;}
+
+  /* ---------- Tabs (dentro do conteúdo, ex.: nada aqui agora — nav principal é a sidebar) ---------- */
+  .tab-panel.hidden{display:none;}
+
+  /* ---------- KPI ledger ---------- */
+  .dashboard-grid{ display:grid; grid-template-columns:repeat(4,1fr); background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md); overflow:hidden; margin-bottom:8px;}
+  .kpi-card{ padding:16px 18px; border-left:3px solid var(--brand);}
+  .kpi-card .kpi-icon{width:18px; height:18px; color:var(--ink-faint); margin-bottom:8px;}
+  .kpi-card .kpi-value{font-size:24px; font-weight:600; font-family:var(--mono); color:var(--ink); line-height:1;}
+  .kpi-card .kpi-label{font-size:11px; color:var(--ink-muted); margin-top:6px; font-weight:600; line-height:1.3;}
+  .kpi-card.k-total{border-left-color:var(--brand);}
+  .kpi-card.k-comnc{border-left-color:var(--info);}
+  .kpi-card.k-semnc{border-left-color:var(--ink-faint);}
+  .kpi-card.k-div{border-left-color:var(--priority);}
+  .kpi-card.k-ok{border-left-color:var(--good);}
+  .kpi-card.k-user{border-left-color:var(--brand);}
+  .kpi-card.k-semreq{border-left-color:var(--pending);}
+  @media(max-width:1000px){ .dashboard-grid{grid-template-columns:repeat(2,1fr);} }
+
+  /* ---------- Filters ---------- */
+  .filters-bar{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md); padding:16px; display:grid; grid-template-columns:repeat(4,1fr); gap:12px;}
+  .filters-bar .f-search{grid-column:1 / -1; display:flex; gap:10px;}
+  .filters-bar label{display:block; font-size:10.5px; font-weight:700; color:var(--ink-muted); margin-bottom:4px; text-transform:uppercase; letter-spacing:.4px;}
+  .filters-bar input, .filters-bar select{ width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:var(--radius-sm); font-size:13px; font-family:var(--sans); color:var(--ink); background:var(--surface);}
+  .filters-bar input:focus, .filters-bar select:focus{outline:2px solid var(--brand); outline-offset:1px; border-color:var(--brand);}
+  .f-search input{flex:1; font-size:14px; padding:10px 12px;}
+  .filters-footer{display:flex; justify-content:space-between; align-items:center; margin-top:6px; font-size:12.5px; color:var(--ink-muted); flex-wrap:wrap; gap:8px;}
+  .active-chips{display:flex; gap:6px; flex-wrap:wrap;}
+  .chip-filter{display:inline-flex; align-items:center; gap:5px; background:var(--brand-soft); color:var(--brand-text); font-size:11.5px; font-weight:600; padding:4px 6px 4px 10px; border-radius:999px;}
+  .chip-filter button{all:unset; cursor:pointer; width:14px; height:14px; display:flex; align-items:center; justify-content:center; border-radius:50%; background:rgba(15,92,58,.15);}
+  .chip-filter button:hover{background:rgba(15,92,58,.3);}
+
+  /* ---------- Table ---------- */
+  .export-row{display:flex; gap:10px; justify-content:flex-end; margin-bottom:12px; flex-wrap:wrap;}
+  .table-wrap{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md); overflow:auto; max-width:100%;}
+  table.data-table{border-collapse:collapse; width:100%; font-size:12.5px; min-width:1300px;}
+  table.data-table thead th{
+    position:sticky; top:0; background:var(--brand-soft); color:var(--brand-deep); text-align:left;
+    padding:10px 12px; font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.3px;
+    cursor:pointer; white-space:nowrap; user-select:none; border-right:1px solid var(--line); border-bottom:1px solid var(--line);
+  }
+  table.data-table thead th:first-child{ position:sticky; left:0; z-index:2;}
+  table.data-table thead th:hover{background:#DCEBE2;}
+  table.data-table thead th .arrow{opacity:.6; margin-left:4px; font-size:9px;}
+  table.data-table tbody td{ padding:9px 12px; border-bottom:1px solid var(--line); white-space:nowrap; vertical-align:top; color:var(--ink);}
+  table.data-table tbody td.wrap{white-space:normal; min-width:180px;}
+  table.data-table tbody td:first-child{ position:sticky; left:0; background:inherit; font-family:var(--mono); font-weight:600;}
+  table.data-table tbody tr{border-left:4px solid transparent;}
+  table.data-table tbody tr.row-semnc{border-left-color:var(--priority); background:var(--priority-soft);}
+  table.data-table tbody tr.row-div{border-left-color:var(--pending); background:var(--pending-soft);}
+  table.data-table tbody tr.row-ok{border-left-color:var(--good); background:var(--good-soft);}
+  table.data-table tbody tr.row-resolved{border-left-color:var(--info); background:var(--info-soft);}
+  table.data-table tbody tr.row-extra td{padding-top:6px; padding-bottom:6px; font-size:12px; opacity:.92;}
+  table.data-table tbody tr:hover{filter:brightness(0.98);}
+  .code-cell{font-family:var(--mono); font-weight:700;}
+  .badge{display:inline-flex; align-items:center; gap:4px; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:700;}
+  .badge svg{width:11px; height:11px;}
+  .badge-red{background:var(--priority-soft); color:var(--priority);}
+  .badge-amber{background:var(--pending-soft); color:var(--pending);}
+  .badge-green{background:var(--good-soft); color:var(--good);}
+  .badge-blue{background:var(--info-soft); color:var(--info);}
+  .badge-grey{background:var(--paper); color:var(--ink-muted);}
+  .empty-state{padding:60px 20px; text-align:center; color:var(--ink-muted); font-size:14px;}
+
+  .pagination{display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-top:1px solid var(--line); font-size:12.5px; flex-wrap:wrap; gap:10px;}
+  .pagination .p-controls{display:flex; align-items:center; gap:8px;}
+  .pagination button{background:var(--surface); border:1px solid var(--line-strong); border-radius:6px; padding:6px 10px; cursor:pointer; font-size:12.5px;}
+  .pagination button:disabled{opacity:.4; cursor:not-allowed;}
+  .pagination select{border:1px solid var(--line); border-radius:6px; padding:5px 8px; font-size:12.5px;}
+
+  /* ---------- Summary ---------- */
+  .summary-stats{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px;}
+  .stat-box{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md); padding:16px;}
+  .stat-box .stat-label{font-size:11px; color:var(--ink-muted); font-weight:700; text-transform:uppercase; letter-spacing:.3px;}
+  .stat-box .stat-value{font-size:21px; font-weight:600; font-family:var(--mono); margin-top:6px; color:var(--ink);}
+  .gauge-wrap{display:flex; align-items:center; gap:20px; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md); padding:22px; margin-bottom:20px;}
+  .gauge{position:relative; width:110px; height:110px; flex:0 0 auto;}
+  .gauge svg{transform:rotate(-90deg);}
+  .gauge .g-val{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-weight:700; font-size:18px; color:var(--ink);}
+  .gauge-text h3{margin:0 0 4px; font-size:14.5px; color:var(--ink);}
+  .gauge-text p{margin:0; font-size:12.5px; color:var(--ink-muted); max-width:420px;}
+
+  .ranking-grid{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+  .ranking-card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md); padding:18px;}
+  .ranking-card h4{margin:0 0 12px; font-size:13px; display:flex; align-items:center; gap:7px; color:var(--ink);}
+  .ranking-card h4 svg{width:15px; height:15px; color:var(--brand);}
+  .ranking-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px;}
+  .ranking-list li{display:flex; justify-content:space-between; gap:10px; font-size:12.5px; padding:7px 0; border-bottom:1px dashed var(--line);}
+  .ranking-list li:last-child{border-bottom:none;}
+  .ranking-list .r-name{font-weight:600; color:var(--ink);}
+  .ranking-list .r-name small{display:block; font-weight:400; color:var(--ink-muted); font-family:var(--mono);}
+  .ranking-list .r-count{font-family:var(--mono); font-weight:700; color:var(--brand-text); white-space:nowrap;}
+  .ranking-note{font-size:11.5px; color:var(--ink-muted); margin-top:10px;}
+  @media(max-width:1000px){ .summary-stats{grid-template-columns:1fr 1fr;} .ranking-grid{grid-template-columns:1fr;} }
+
+  footer.app-footer{ text-align:center; padding:26px; color:var(--ink-faint); font-size:11.5px; border-top:1px solid var(--line);}
+
+  @media(max-width:820px){
+    .shell{ grid-template-columns:1fr;}
+    aside.sidebar{ position:static; height:auto; flex-direction:row; align-items:center; padding:12px 16px; overflow-x:auto;}
+    .brandmark{ border-bottom:none; padding:0 12px 0 0; margin:0; border-right:1px solid rgba(255,255,255,.14);}
+    nav.navlist{ flex-direction:row; flex:none;}
+    .sidebar-foot{ display:none;}
+    .page-content{ padding:18px 16px 60px;}
+    .topbar{ padding:12px 16px;}
+    .upload-grid{grid-template-columns:1fr;}
+    .filters-bar{grid-template-columns:1fr 1fr;}
+  }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <aside class="sidebar">
+    <div class="brandmark">
+      <div class="seal">Z</div>
+      <div class="names">
+        <b>Zagonel</b>
+        <span>Análise Depósito 023</span>
+      </div>
+    </div>
+
+    <nav class="navlist" id="tabNav">
+      <button class="tab-btn active" data-tab="analise">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        Nova Análise
+      </button>
+      <button class="tab-btn" data-tab="historico">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 3"/></svg>
+        Histórico de Relatórios
+      </button>
+    </nav>
+
+    <div class="sidebar-foot">Arquivos processados localmente no navegador — nenhum dado é enviado a servidores externos.</div>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <div class="title">
+        <h1>Análise Cruzada — Depósito 023</h1>
+        <p>Validação automática entre Estoque, Não Conformidades e Requisições</p>
+      </div>
+      <div class="topbar-actions" style="display:flex; align-items:center; gap:14px;">
+        <div class="header-meta" id="headerMeta">Aguardando arquivos…</div>
+        <button class="btn-secondary hidden" id="btnNovaAnalise">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px; margin-right:5px;"><path d="M12 5v14M5 12h14"/></svg>
+          Nova Análise
+        </button>
+      </div>
+    </div>
+
+    <div class="page-content">
+
+  <section id="panelAnalise" class="tab-panel">
+
+  <div id="historicBanner" class="historic-banner hidden">
+    <span><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px; margin-right:4px;"><path d="M3 7h5l2 2h11v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7z"/></svg>Visualizando relatório histórico: <strong id="historicBannerName"></strong> <span id="historicBannerDate"></span></span>
+    <button class="btn-secondary" id="btnBackToHistory">← Voltar ao Histórico</button>
+    <button class="btn-secondary" id="btnNovaAnaliseFromHistoric">+ Nova Análise</button>
+  </div>
+
+  <div id="uploadSection">
+  <div class="section-title">
+    <span class="idx">01</span>
+    <h2>Upload dos arquivos</h2>
+    <span class="sub">Carregue os três arquivos para habilitar a análise</span>
+  </div>
+
+  <div class="upload-grid">
+    <div class="upload-card" id="card1">
+      <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M9 13h6M9 17h6M9 9h2"/></svg>
+      <h3>Relatório do Depósito 023</h3>
+      <p class="upload-desc">Base principal da análise — situação de estoque</p>
+      <input type="file" id="input1" accept=".xlsx,.xls" hidden>
+      <button class="btn-select" data-target="input1">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4M12 4l-4 4M12 4l4 4"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+        Selecionar Arquivo
+      </button>
+      <div class="upload-status" id="status1"></div>
+    </div>
+    <div class="upload-card" id="card2">
+      <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M9 13h6M9 17h6M9 9h2"/></svg>
+      <h3>Registros de Não Conformidade</h3>
+      <p class="upload-desc">Saldo: Pendente/Em andamento · Resolvido: só verifica requisição</p>
+      <input type="file" id="input2" accept=".xlsx,.xls" hidden>
+      <button class="btn-select" data-target="input2">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4M12 4l-4 4M12 4l4 4"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+        Selecionar Arquivo
+      </button>
+      <div class="upload-status" id="status2"></div>
+    </div>
+    <div class="upload-card" id="card3">
+      <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M9 13h6M9 17h6M9 9h2"/></svg>
+      <h3>Requisições da Transação 90246</h3>
+      <p class="upload-desc">Usuário responsável por cada requisição</p>
+      <input type="file" id="input3" accept=".xlsx,.xls" hidden>
+      <button class="btn-select" data-target="input3">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4M12 4l-4 4M12 4l4 4"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+        Selecionar Arquivo
+      </button>
+      <div class="upload-status" id="status3"></div>
+    </div>
+  </div>
+
+  <div class="responsible-row">
+    <label for="fResponsavel">Responsável pela análise (opcional)</label>
+    <input type="text" id="fResponsavel" placeholder="Seu nome — será salvo no histórico">
+  </div>
+
+  <div class="btn-execute-row">
+    <button class="btn-primary" id="btnExecutar" disabled>Executar Análise</button>
+  </div>
+  </div>
+
+  <div id="resultsWrap" class="hidden">
+
+    <div class="section-title">
+      <span class="idx">02</span>
+      <h2>Resumo executivo</h2>
+      <span class="sub" id="dashSub"></span>
+    </div>
+
+    <div class="gauge-wrap">
+      <div class="gauge">
+        <svg width="110" height="110" viewBox="0 0 110 110">
+          <circle cx="55" cy="55" r="46" fill="none" stroke="var(--line)" stroke-width="12"/>
+          <circle id="gaugeArc" cx="55" cy="55" r="46" fill="none" stroke="var(--good)" stroke-width="12" stroke-linecap="round" stroke-dasharray="289" stroke-dashoffset="289"/>
+        </svg>
+        <div class="g-val" id="gaugeVal">0%</div>
+      </div>
+      <div class="gauge-text">
+        <h3>Percentual de conformidade</h3>
+        <p>Proporção de itens cuja quantidade em depósito confere exatamente com a quantidade registrada na não conformidade correspondente.</p>
+      </div>
+    </div>
+
+    <div class="summary-stats" id="summaryStats"></div>
+
+    <div class="ranking-grid">
+      <div class="ranking-card">
+        <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>Ranking de usuários (requisições)</h4>
+        <ul class="ranking-list" id="rankUsuarios"></ul>
+      </div>
+      <div class="ranking-card">
+        <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V9M11 19V4M18 19v-6"/></svg>Maiores divergências de quantidade</h4>
+        <ul class="ranking-list" id="rankDivergencia"></ul>
+      </div>
+      <div class="ranking-card">
+        <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>Itens sem NC</h4>
+        <ul class="ranking-list" id="rankSemNC"></ul>
+        <div class="ranking-note" id="rankSemNCNote"></div>
+      </div>
+      <div class="ranking-card">
+        <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M9 13h6M9 17h6M9 9h2"/></svg>Itens sem requisição</h4>
+        <ul class="ranking-list" id="rankSemReq"></ul>
+        <div class="ranking-note" id="rankSemReqNote"></div>
+      </div>
+    </div>
+
+    <div class="section-title">
+      <span class="idx">03</span>
+      <h2>Painel de indicadores</h2>
+      <span class="sub">Contagens detalhadas por categoria</span>
+    </div>
+    <div class="dashboard-grid" id="dashboardGrid"></div>
+
+    <div class="section-title">
+      <span class="idx">04</span>
+      <h2>Filtros</h2>
+      <span class="sub">Refine os resultados da tabela consolidada</span>
+    </div>
+    <div class="filters-bar">
+      <div class="f-search">
+        <div style="flex:1">
+          <label>Pesquisa dinâmica</label>
+          <input type="text" id="fSearch" placeholder="Buscar por item, descrição, usuário, NC ou requisição…">
+        </div>
+        <div>
+          <label>&nbsp;</label>
+          <button class="btn-secondary" id="btnClearFilters">Limpar filtros</button>
+        </div>
+      </div>
+      <div><label>Item / Código</label><input type="text" id="fItem" placeholder="Código ou descrição"></div>
+      <div><label>Usuário</label><select id="fUsuario"><option value="__all__">Todos</option></select></div>
+      <div><label>Nº da NC</label><input type="text" id="fNumNC" placeholder="Ex: 4851"></div>
+      <div><label>Status da NC</label>
+        <select id="fStatusNC">
+          <option value="__all__">Todos</option>
+          <option value="Pendente">Pendente</option>
+          <option value="Em andamento">Em andamento</option>
+          <option value="Resolvido">Resolvido</option>
+        </select>
+      </div>
+      <div><label>Possui NC</label>
+        <select id="fPossuiNC"><option value="__all__">Todos</option><option value="Sim">Sim</option><option value="Não">Não</option></select>
+      </div>
+      <div><label>Possui divergência</label>
+        <select id="fDivergencia"><option value="__all__">Todos</option><option value="Sim">Sim</option><option value="Não">Não</option></select>
+      </div>
+      <div><label>Possui requisição</label>
+        <select id="fPossuiReq"><option value="__all__">Todos</option><option value="Sim">Sim</option><option value="Não">Não</option></select>
+      </div>
+      <div><label>Data requisição (de)</label><input type="date" id="fDateFrom"></div>
+      <div><label>Data requisição (até)</label><input type="date" id="fDateTo"></div>
+      <div class="filters-footer" style="grid-column:1/-1;">
+        <div class="active-chips" id="activeChips"></div>
+      </div>
+    </div>
+
+    <div class="section-title">
+      <span class="idx">05</span>
+      <h2>Tabela consolidada</h2>
+      <span class="sub" id="tableSub"></span>
+    </div>
+
+    <div class="export-row">
+      <button class="btn-export" id="btnExportExcel">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+        Excel (.xlsx)
+      </button>
+      <button class="btn-export" id="btnExportWord">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+        Word (.docx)
+      </button>
+      <button class="btn-export" id="btnExportPdf">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+        PDF
+      </button>
+    </div>
+
+    <div class="table-wrap">
+      <table class="data-table" id="dataTable">
+        <thead>
+          <tr>
+            <th data-key="codigo">Item</th>
+            <th data-key="descricao">Descrição</th>
+            <th data-key="qtdeDeposito">Qtde Depósito</th>
+            <th data-key="possuiNC">Possui NC</th>
+            <th data-key="numNC">Nº NC</th>
+            <th data-key="statusNC">Status NC</th>
+            <th data-key="qtdeNC">Qtde NC</th>
+            <th data-key="conferencia">Conferência</th>
+            <th data-key="diferenca">Diferença</th>
+            <th data-key="numRequisicao">Nº Requisição</th>
+            <th data-key="usuario">Usuário</th>
+            <th data-key="dataRequisicao">Data Requisição</th>
+            <th data-key="observacoes">Observações</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+      <div class="pagination">
+        <div id="pageInfo"></div>
+        <div class="p-controls">
+          <label style="font-size:12.5px;">Linhas por página:
+            <select id="pageSize">
+              <option value="25">25</option>
+              <option value="50" selected>50</option>
+              <option value="100">100</option>
+              <option value="250">250</option>
+            </select>
+          </label>
+          <button id="btnPrev">‹ Anterior</button>
+          <span id="pageNum"></span>
+          <button id="btnNext">Próxima ›</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  </section>
+
+  <section id="panelHistorico" class="tab-panel hidden">
+
+    <div class="section-title">
+      <span class="idx">H</span>
+      <h2>Histórico de Relatórios</h2>
+      <span class="sub">Consulte análises já processadas sem reenviar os arquivos</span>
+    </div>
+    <div id="historyStorageMode" class="history-mode-note"></div>
+
+    <div class="filters-bar" id="historyFiltersBar">
+      <div><label>Período (de)</label><input type="date" id="hDateFrom"></div>
+      <div><label>Período (até)</label><input type="date" id="hDateTo"></div>
+      <div><label>Nome do arquivo</label><input type="text" id="hArquivo" placeholder="Ex: 023.xlsx"></div>
+      <div><label>Status da análise</label>
+        <select id="hStatus"><option value="__all__">Todos</option><option value="Concluído">Concluído</option></select>
+      </div>
+      <div><label>Produto (descrição)</label><input type="text" id="hProduto" placeholder="Busca no conteúdo do relatório"></div>
+      <div><label>Código do produto</label><input type="text" id="hCodigo" placeholder="Busca no conteúdo do relatório"></div>
+      <div><label>Motivo da não conformidade</label><input type="text" id="hMotivo" placeholder="Busca no conteúdo do relatório"></div>
+      <div><label>Usuário</label><input type="text" id="hUsuario" placeholder="Requisitante ou responsável"></div>
+      <div class="f-search" style="grid-column:1/-1;">
+        <div style="flex:1"></div>
+        <div><label>&nbsp;</label><button class="btn-secondary" id="btnClearHistoryFilters">Limpar filtros</button></div>
+      </div>
+    </div>
+
+    <div id="historySearchNote" class="history-search-note hidden">Buscando no conteúdo dos relatórios armazenados…</div>
+
+    <div class="table-wrap" style="margin-top:16px;">
+      <table class="data-table" id="historyTable" style="min-width:1100px;">
+        <thead>
+          <tr>
+            <th>Data/Hora</th>
+            <th>Nome do Relatório</th>
+            <th>Arquivos Utilizados</th>
+            <th>Registros</th>
+            <th>Responsável</th>
+            <th>Status</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="historyTableBody"></tbody>
+      </table>
+    </div>
+    <div class="history-note" id="historyCount"></div>
+
+  </section>
+
+    </div>
+  </main>
+</div>
+
+<footer class="app-footer">
+  Análise Cruzada · Depósito 023 — arquivos processados localmente no navegador · relatórios gerados ficam salvos de forma persistente nesta aplicação, para consulta posterior sem reenvio.
+</footer>
+
+<script>
+(function(){
+"use strict";
+
+/* ===================== LAZY LOADING DE BIBLIOTECAS ===================== */
+// XLSX, jsPDF, jsPDF-AutoTable e JSZip só são baixados quando realmente
+// necessários (no primeiro upload, no primeiro export em PDF, ou no reparo
+// de um .xlsx com ZIP malformado), em vez de sempre no carregamento da página.
+const LIB_URLS={
+  xlsx:'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
+  jspdf:'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+  autotable:'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js',
+  jszip:'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'
+};
+const _libPromises={};
+function loadScriptTag(url){
+  return new Promise((resolve,reject)=>{
+    const s=document.createElement('script');
+    s.src=url; s.onload=()=>resolve(); s.onerror=()=>reject(new Error('Falha ao carregar biblioteca externa ('+url+'). Verifique sua conexão.'));
+    document.head.appendChild(s);
+  });
+}
+function ensureLib(name){
+  if(_libPromises[name]) return _libPromises[name];
+  _libPromises[name]=loadScriptTag(LIB_URLS[name]);
+  return _libPromises[name];
+}
+
+/* ===================== TAB NAVIGATION ===================== */
+function switchTab(name){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===name));
+  document.getElementById('panelAnalise').classList.toggle('hidden', name!=='analise');
+  document.getElementById('panelHistorico').classList.toggle('hidden', name!=='historico');
+  if(name==='historico') renderHistoryList();
+}
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>switchTab(btn.dataset.tab));
+});
+
+
+/* ===================== UTILS ===================== */
+function normalize(s){
+  return String(s==null?'':s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+}
+function normalize3(s){ return normalize(s).replace(/[^a-z0-9]/g,''); }
+function escapeHtml(s){
+  return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function parseBRNumber(v){
+  if(v==null || v==='') return 0;
+  if(typeof v==='number') return v;
+  let s=String(v).trim();
+  if(s==='') return 0;
+  // BR format: thousand '.' decimal ','
+  if(/,/.test(s)){ s=s.replace(/\./g,'').replace(',', '.'); }
+  const n=parseFloat(s);
+  return isNaN(n)?0:n;
+}
+function parseBRDate(v){
+  if(v==null || v==='') return null;
+  if(v instanceof Date && !isNaN(v)) return v;
+  const s=String(v).trim();
+  const m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if(m){
+    let dd=+m[1], mm=+m[2], yy=+m[3];
+    if(yy<100) yy+=2000;
+    const d=new Date(yy, mm-1, dd);
+    return isNaN(d) ? null : d;
+  }
+  const d2=new Date(s);
+  return isNaN(d2) ? null : d2;
+}
+function formatDate(d){
+  if(!d) return '-';
+  return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();
+}
+function fmtQty(n){
+  if(n==null || isNaN(n)) return '-';
+  const r=Math.round(n*1000)/1000;
+  return r.toLocaleString('pt-BR');
+}
+function round2(n){ return Math.round(n*100)/100; }
+function findKey(obj, candidates){
+  const keys=Object.keys(obj);
+  const norm=keys.map(k=>({k, n:normalize3(k)}));
+  for(const c of candidates){ const hit=norm.find(e=>e.n===c); if(hit) return hit.k; }
+  for(const c of candidates){ const hit=norm.find(e=>e.n.includes(c)); if(hit) return hit.k; }
+  return null;
+}
+function conferenciaLabel(c){
+  if(c==='confere') return '🟢 Quantidade confere';
+  if(c==='divergencia') return '🟡 Divergência de quantidade';
+  if(c==='resolvida_ok') return '✔ NC Resolvida — requisição encontrada';
+  if(c==='resolvida_sem_req') return '⚠ NC Resolvida — sem requisição correspondente';
+  return '🔴 Item sem NC';
+}
+
+/* ===================== STATE ===================== */
+const state = {
+  file1:null, file2:null, file3:null,
+  consolidated:[], filtered:[], stats:null, primaryRows:[],
+  sort:{key:null, dir:'asc'},
+  page:1, pageSize:50,
+  currentReportId:null
+};
+const historyDataCache={};
+
+/* Camada de armazenamento com fallback em cascata:
+   1) window.storage (armazenamento persistente do artifact, quando disponível)
+   2) localStorage do navegador (persiste por navegador/dispositivo)
+   3) memória (apenas durante a sessão atual — perdido ao recarregar a página)
+   A aplicação funciona em qualquer um dos três casos; o nível ativo é sinalizado na aba Histórico. */
+const LS_PREFIX='zagonel_dep023_hist__';
+const memoryStore=new Map();
+const STORAGE_MODE=(function(){
+  try{
+    if(typeof window!=='undefined' && window.storage
+      && typeof window.storage.get==='function' && typeof window.storage.set==='function'
+      && typeof window.storage.list==='function' && typeof window.storage.delete==='function'){
+      return 'artifact';
+    }
+  }catch(e){ /* segue para o próximo nível */ }
+  try{
+    const testKey='__ls_test__'+Date.now();
+    window.localStorage.setItem(testKey,'1');
+    window.localStorage.removeItem(testKey);
+    return 'local';
+  }catch(e){ /* localStorage indisponível ou bloqueado */ }
+  return 'memory';
+})();
+const storageAdapter={
+  async get(key){
+    if(STORAGE_MODE==='artifact') return window.storage.get(key, false);
+    if(STORAGE_MODE==='local'){
+      const raw=window.localStorage.getItem(LS_PREFIX+key);
+      if(raw==null) throw new Error('key not found');
+      return {key, value:raw, shared:false};
+    }
+    if(!memoryStore.has(key)) throw new Error('key not found');
+    return {key, value:memoryStore.get(key), shared:false};
+  },
+  async set(key, value){
+    if(STORAGE_MODE==='artifact') return window.storage.set(key, value, false);
+    if(STORAGE_MODE==='local'){
+      window.localStorage.setItem(LS_PREFIX+key, value);
+      return {key, value, shared:false};
+    }
+    memoryStore.set(key, value);
+    return {key, value, shared:false};
+  },
+  async delete(key){
+    if(STORAGE_MODE==='artifact') return window.storage.delete(key, false);
+    if(STORAGE_MODE==='local'){
+      window.localStorage.removeItem(LS_PREFIX+key);
+      return {key, deleted:true, shared:false};
+    }
+    memoryStore.delete(key);
+    return {key, deleted:true, shared:false};
+  },
+  async list(prefix){
+    if(STORAGE_MODE==='artifact') return window.storage.list(prefix, false);
+    if(STORAGE_MODE==='local'){
+      const keys=[];
+      for(let i=0;i<window.localStorage.length;i++){
+        const k=window.localStorage.key(i);
+        if(k && k.indexOf(LS_PREFIX)===0){
+          const stripped=k.slice(LS_PREFIX.length);
+          if(!prefix || stripped.indexOf(prefix)===0) keys.push(stripped);
+        }
+      }
+      return {keys, prefix, shared:false};
+    }
+    const keys=Array.from(memoryStore.keys()).filter(k=>!prefix || k.indexOf(prefix)===0);
+    return {keys, prefix, shared:false};
+  }
+};
+
+/* ===================== FILE READING ===================== */
+function readFileAsArrayBuffer(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=e=>resolve(e.target.result);
+    reader.onerror=()=>reject(new Error('Falha ao ler o arquivo do disco.'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+// Algumas ferramentas de exportação (ex.: componentes de DataGrid .NET/Telerik/Kendo que geram o
+// .xlsx via streaming) gravam a declaração de dimensão da planilha (<dimension ref="A1:A1"/>)
+// incorreta — presa em uma única célula — mesmo havendo dezenas/centenas de linhas de dados reais.
+// Isso faz o leitor confiar no "!ref" errado e truncar a leitura para 1 linha. Aqui recalculamos o
+// intervalo real da planilha a partir das células efetivamente presentes no objeto, corrigindo isso.
+function normalizeWorkbookRanges(wb){
+  for(const name of wb.SheetNames){
+    const ws=wb.Sheets[name];
+    if(!ws) continue;
+    let maxRow=-1, maxCol=-1, minRow=Infinity, minCol=Infinity, any=false;
+    for(const key in ws){
+      if(key.charCodeAt(0)===33) continue; // ignora chaves especiais que começam com "!"
+      if(!/^[A-Z]+[0-9]+$/.test(key)) continue;
+      any=true;
+      const addr=XLSX.utils.decode_cell(key);
+      if(addr.r>maxRow) maxRow=addr.r;
+      if(addr.c>maxCol) maxCol=addr.c;
+      if(addr.r<minRow) minRow=addr.r;
+      if(addr.c<minCol) minCol=addr.c;
+    }
+    if(any){
+      ws['!ref']=XLSX.utils.encode_range({s:{r:minRow,c:minCol}, e:{r:maxRow,c:maxCol}});
+    }
+  }
+  return wb;
+}
+function tryParseWorkbook(bytes){
+  const wb=XLSX.read(bytes, {type:'array'});
+  if(!wb || !wb.SheetNames || !wb.SheetNames.length) throw new Error('O arquivo não contém planilhas legíveis.');
+  normalizeWorkbookRanges(wb);
+  const firstSheet=wb.Sheets[wb.SheetNames[0]];
+  if(!firstSheet || !firstSheet['!ref']) throw new Error('A primeira planilha do arquivo está vazia.');
+  return wb;
+}
+// Alguns relatórios exportados por sistemas legados (ex.: SAP) geram o .xlsx com separadores de
+// caminho "\" dentro do contêiner ZIP em vez de "/", o que viola a especificação ZIP e quebra
+// leitores rigorosos. Esta função reconstrói o arquivo normalizando os nomes internos.
+async function repairBackslashZip(buf){
+  await ensureLib('jszip');
+  const zip=await JSZip.loadAsync(buf);
+  const newZip=new JSZip();
+  const names=Object.keys(zip.files);
+  for(const name of names){
+    const entry=zip.files[name];
+    const fixedName=name.replace(/\\/g,'/');
+    if(entry.dir){ newZip.folder(fixedName); continue; }
+    const content=await entry.async('uint8array');
+    newZip.file(fixedName, content);
+  }
+  return await newZip.generateAsync({type:'uint8array'});
+}
+async function readFileAsWorkbook(file){
+  const buf=await readFileAsArrayBuffer(file);
+  try{
+    return tryParseWorkbook(new Uint8Array(buf));
+  }catch(firstErr){
+    try{
+      const fixedBytes=await repairBackslashZip(buf);
+      return tryParseWorkbook(fixedBytes);
+    }catch(secondErr){
+      throw new Error('Arquivo em formato inválido ou corrompido. ('+firstErr.message+')');
+    }
+  }
+}
+
+
+/* ===================== PARSERS ===================== */
+
+// Lê TODAS as abas do arquivo como grades brutas (sem assumir que a aba 1 / linha 1 são os dados),
+// pois relatórios reais frequentemente têm abas extras, linhas de título ou filtros acima do cabeçalho.
+function getAllSheetGrids(wb){
+  return wb.SheetNames.map(name=>({
+    name,
+    grid: XLSX.utils.sheet_to_json(wb.Sheets[name], {header:1, defval:'', raw:false})
+  }));
+}
+// Procura, nas primeiras linhas de uma grade, a linha que contém todos os grupos de cabeçalho exigidos.
+// requiredSets: [[chave, [candidatos normalizados...]], ...]
+function locateHeaderRow(grid, requiredSets, maxScan){
+  maxScan = maxScan || Math.min(grid.length, 40);
+  for(let i=0;i<maxScan;i++){
+    const row=grid[i];
+    if(!row || !row.length) continue;
+    const norms=row.map(c=>normalize3(c));
+    let ok=true;
+    for(const [,cands] of requiredSets){
+      let found=-1;
+      for(const cand of cands){ const f=norms.indexOf(cand); if(f>=0){found=f;break;} }
+      if(found<0){ for(const cand of cands){ const f=norms.findIndex(n=>n.indexOf(cand)>=0); if(f>=0){found=f;break;} } }
+      if(found<0){ ok=false; break; }
+    }
+    if(ok) return {rowIdx:i, norms};
+  }
+  return null;
+}
+function findColInRow(norms, candidates){
+  for(const cand of candidates){ const f=norms.indexOf(cand); if(f>=0) return f; }
+  for(const cand of candidates){ const f=norms.findIndex(n=>n.indexOf(cand)>=0); if(f>=0) return f; }
+  return -1;
+}
+function sheetsSummary(sheets){
+  return sheets.map(s=>s.name+' ('+s.grid.length+' linha(s))').join(', ');
+}
+
+// Arquivo 1: relatório SAP-like "Situação de Estoque" — cabeçalho e linhas de dados, colunas "Cód." e "Produto"
+function parseDeposito(wb){
+  const sheets=getAllSheetGrids(wb);
+  const required=[['cod',['cod']], ['produto',['produto']]];
+  let located=null, usedSheet=null;
+  for(const s of sheets){ const loc=locateHeaderRow(s.grid, required); if(loc){ located=loc; usedSheet=s; break; } }
+  if(!located){
+    return {items:[], errors:['Não foi possível localizar as colunas "Cód." e "Produto" em nenhuma aba do arquivo do Depósito 023. Abas verificadas: '+sheetsSummary(sheets)+'.']};
+  }
+  const {rowIdx, norms}=located;
+  const grid=usedSheet.grid;
+  const colCod=findColInRow(norms,['cod']);
+  const colProduto=findColInRow(norms,['produto']);
+  const colUm=findColInRow(norms,['um']);
+  const colQuant=findColInRow(norms,['quant']);
+  if(colQuant<0){
+    return {items:[], errors:['A coluna de quantidade em estoque (ex.: "Quant. Estoq.") não foi encontrada na aba "'+usedSheet.name+'" do arquivo do Depósito 023.']};
+  }
+  const items=[]; const byCode={};
+  for(let i=rowIdx+1;i<grid.length;i++){
+    const row=grid[i];
+    if(!row || !row.length) continue;
+    const rawCod=row[colCod];
+    const nCod=normalize3(rawCod);
+    if(!nCod) continue;
+    if(nCod==='deposito') continue;
+    if(nCod.indexOf('total')===0) continue;
+    if(nCod==='cod') continue;
+    const produto=row[colProduto];
+    if(!produto) continue;
+    const codigo=String(rawCod).trim();
+    const qtd=parseBRNumber(row[colQuant]);
+    const um=colUm>=0 ? String(row[colUm]||'').trim() : '';
+    if(byCode[codigo]){
+      byCode[codigo].qtdeDeposito+=qtd;
+    } else {
+      const it={codigo, descricao:String(produto).trim(), um, qtdeDeposito:qtd};
+      byCode[codigo]=it; items.push(it);
+    }
+  }
+  if(items.length===0){
+    return {items:[], errors:['A aba "'+usedSheet.name+'" foi localizada, mas nenhuma linha de item de estoque foi encontrada abaixo do cabeçalho.']};
+  }
+  return {items, errors:[]};
+}
+
+// Arquivo 2: Registros de Não Conformidade — busca cabeçalho ("Status" + "Cód. Prod." + "Qtde.") em qualquer aba/linha
+function parseNC(wb){
+  const sheets=getAllSheetGrids(wb);
+  const required=[['status',['status']], ['cod',['codprod','codproduto','codigoproduto','cod']], ['qtde',['qtde','quantidade']]];
+  let located=null, usedSheet=null;
+  for(const s of sheets){ const loc=locateHeaderRow(s.grid, required); if(loc){ located=loc; usedSheet=s; break; } }
+  if(!located){
+    return {items:[], errors:['Não foi possível localizar as colunas "Status", "Cód. Prod." e "Qtde." em nenhuma aba do arquivo de Não Conformidade. Abas verificadas: '+sheetsSummary(sheets)+'.']};
+  }
+  const {rowIdx, norms}=located;
+  const grid=usedSheet.grid;
+  const colId=findColInRow(norms,['id']);
+  const colData=findColInRow(norms,['datanc','data']);
+  const colStatus=findColInRow(norms,['status']);
+  const colQtde=findColInRow(norms,['qtde','quantidade']);
+  const colCod=findColInRow(norms,['codprod','codproduto','codigoproduto','cod']);
+  const colProd=findColInRow(norms,['produto']);
+  const colFunc=findColInRow(norms,['funcionario']);
+  const colObs=findColInRow(norms,['observacao']);
+  const colTipo=findColInRow(norms,['tipo']);
+
+  const items=[];
+  for(let i=rowIdx+1;i<grid.length;i++){
+    const row=grid[i];
+    if(!row || !row.length) continue;
+    const codVal=colCod>=0 ? row[colCod] : '';
+    const codigo=String(codVal||'').trim();
+    if(!codigo) continue;
+    items.push({
+      id: colId>=0 ? row[colId] : '',
+      dataNC: parseBRDate(colData>=0 ? row[colData] : null),
+      status: colStatus>=0 ? String(row[colStatus]||'').trim() : '',
+      qtde: parseBRNumber(colQtde>=0 ? row[colQtde] : ''),
+      codigo,
+      produto: colProd>=0 ? String(row[colProd]||'').trim() : '',
+      funcionario: colFunc>=0 ? String(row[colFunc]||'').trim() : '',
+      observacao: colObs>=0 ? String(row[colObs]||'').trim() : '',
+      motivo: colTipo>=0 ? String(row[colTipo]||'').trim() : ''
+    });
+  }
+  if(items.length===0){
+    return {items:[], errors:['A aba "'+usedSheet.name+'" foi localizada, mas nenhuma linha de Não Conformidade foi encontrada abaixo do cabeçalho.']};
+  }
+  return {items, errors:[]};
+}
+
+// Arquivo 3: Requisições da Transação 90246 — código embutido no campo Produto: "0000000000 - Descrição"
+function parseRequisicoes(wb){
+  const sheets=getAllSheetGrids(wb);
+  const required=[['produto',['produto']]];
+  let located=null, usedSheet=null;
+  for(const s of sheets){ const loc=locateHeaderRow(s.grid, required); if(loc){ located=loc; usedSheet=s; break; } }
+  if(!located){
+    return {items:[], errors:['Não foi possível localizar a coluna "Produto" (com o código do item) em nenhuma aba do arquivo de Requisições. Abas verificadas: '+sheetsSummary(sheets)+'.']};
+  }
+  const {rowIdx, norms}=located;
+  const grid=usedSheet.grid;
+  const colStatus=findColInRow(norms,['status']);
+  const colDataReq=findColInRow(norms,['datareq']);
+  const colTran=findColInRow(norms,['tranreq','tran']);
+  const colProduto=findColInRow(norms,['produto']);
+  const colUsuarioReq=findColInRow(norms,['usuariorequisitante','requisitante']);
+  const colUsuarioRec=findColInRow(norms,['usuariorecebedor','recebedor']);
+  const colObs=findColInRow(norms,['observacao']);
+  const colQtd=findColInRow(norms,['requisitado','quantidade','qtde']);
+
+  const items=[];
+  for(let i=rowIdx+1;i<grid.length;i++){
+    const row=grid[i];
+    if(!row || !row.length) continue;
+    const raw=String(colProduto>=0 ? (row[colProduto]||'') : '').trim();
+    if(!raw) continue;
+    const idx=raw.indexOf(' - ');
+    const codigo=(idx>-1 ? raw.slice(0,idx) : raw).trim();
+    const descricao=(idx>-1 ? raw.slice(idx+3) : '').trim();
+    if(!codigo) continue;
+    items.push({
+      status: colStatus>=0 ? String(row[colStatus]||'').trim() : '',
+      dataReq: parseBRDate(colDataReq>=0 ? row[colDataReq] : null),
+      tranReq: colTran>=0 ? String(row[colTran]||'').trim() : '',
+      codigo, descricao,
+      usuario: (colUsuarioReq>=0 && row[colUsuarioReq]) ? String(row[colUsuarioReq]).trim() : ((colUsuarioRec>=0 && row[colUsuarioRec]) ? String(row[colUsuarioRec]).trim() : '-'),
+      observacao: colObs>=0 ? String(row[colObs]||'').trim() : '',
+      requisitado: colQtd>=0 ? parseBRNumber(row[colQtd]) : null
+    });
+  }
+  if(items.length===0){
+    return {items:[], errors:['A aba "'+usedSheet.name+'" foi localizada, mas nenhuma linha de requisição foi encontrada abaixo do cabeçalho.']};
+  }
+  return {items, errors:[]};
+}
+
+/* ===================== UPLOAD UI ===================== */
+function setStatus(idx, kind, msg){
+  const el=document.getElementById('status'+idx);
+  const card=document.getElementById('card'+idx);
+  const ICONS={
+    loading:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/></svg>',
+    success:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/></svg>',
+    error:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>'
+  };
+  el.className='upload-status state-'+kind;
+  el.innerHTML = msg ? (ICONS[kind]||'') + '<span>'+escapeHtml(msg)+'</span>' : '';
+  card.classList.remove('is-success','is-error');
+  if(kind==='success') card.classList.add('is-success');
+  if(kind==='error') card.classList.add('is-error');
+}
+function updateExecuteButton(){
+  const btn=document.getElementById('btnExecutar');
+  btn.disabled = !(state.file1 && state.file2 && state.file3);
+}
+async function handleFile(idx, file){
+  setStatus(idx,'loading','Lendo '+file.name+'…');
+  try{
+    await ensureLib('xlsx');
+    const wb=await readFileAsWorkbook(file);
+    let result;
+    if(idx===1) result=parseDeposito(wb);
+    if(idx===2) result=parseNC(wb);
+    if(idx===3) result=parseRequisicoes(wb);
+    if(result.errors.length){
+      state['file'+idx]=null;
+      setStatus(idx,'error',result.errors.join(' '));
+    } else if(result.items.length===0){
+      state['file'+idx]=null;
+      setStatus(idx,'error','Nenhum registro válido foi encontrado neste arquivo.');
+    } else {
+      state['file'+idx]={name:file.name, items:result.items};
+      setStatus(idx,'success',file.name+' — '+result.items.length.toLocaleString('pt-BR')+' registros carregados');
+    }
+  }catch(err){
+    state['file'+idx]=null;
+    setStatus(idx,'error','Erro ao processar o arquivo: '+err.message);
+  }
+  updateExecuteButton();
+}
+[1,2,3].forEach(idx=>{
+  const input=document.getElementById('input'+idx);
+  const card=document.getElementById('card'+idx);
+  card.querySelector('.btn-select').addEventListener('click', ()=>input.click());
+  input.addEventListener('change', ()=>{
+    if(input.files && input.files[0]) handleFile(idx, input.files[0]);
+  });
+});
+
+/* ===================== ANALYSIS ===================== */
+function groupBy(arr, keyFn){
+  const map={};
+  for(const item of arr){
+    const k=keyFn(item);
+    if(!map[k]) map[k]=[];
+    map[k].push(item);
+  }
+  return map;
+}
+function buildRow(item, nc, req, observacao, allocatedQty){
+  if(allocatedQty===undefined) allocatedQty=item.qtdeDeposito;
+  let conferencia, diferenca=null;
+  if(!nc){
+    conferencia='sem_nc';
+  } else {
+    diferenca=round2(allocatedQty - nc.qtde);
+    conferencia = Math.abs(diferenca) < 0.005 ? 'confere' : 'divergencia';
+  }
+  return {
+    codigo:item.codigo, descricao:item.descricao, um:item.um, qtdeDeposito:item.qtdeDeposito,
+    possuiNC: nc? 'Sim':'Não',
+    numNC: nc? String(nc.id) : '',
+    statusNC: nc? nc.status : '',
+    qtdeNC: nc? nc.qtde : null,
+    dataNC: nc? nc.dataNC : null,
+    motivoNC: nc? (nc.motivo||'') : '',
+    conferencia, diferenca,
+    requisicaoEncontrada: !!req,
+    numRequisicao: req? req.tranReq : '',
+    usuario: req? req.usuario : '',
+    dataRequisicao: req? req.dataReq : null,
+    observacoes: observacao || ''
+  };
+}
+function buildResolvedRow(item, nc, req, observacao){
+  const conferencia = req ? 'resolvida_ok' : 'resolvida_sem_req';
+  return {
+    codigo:item.codigo, descricao:item.descricao, um:item.um, qtdeDeposito:item.qtdeDeposito,
+    possuiNC:'Sim',
+    numNC:String(nc.id), statusNC:nc.status, qtdeNC:nc.qtde, dataNC:nc.dataNC, motivoNC:nc.motivo||'',
+    conferencia, diferenca:null,
+    requisicaoEncontrada: !!req,
+    numRequisicao: req? req.tranReq : '',
+    usuario: req? req.usuario : '',
+    dataRequisicao: req? req.dataReq : null,
+    observacoes: observacao || ''
+  };
+}
+function runAnalysis(){
+  const isActiveStatus = nc=>{ const n=normalize(nc.status); return n==='pendente' || n==='em andamento'; };
+  const isResolvedStatus = nc=> normalize(nc.status)==='resolvido';
+  const ncActiveByCodigo=groupBy(state.file2.items.filter(isActiveStatus), nc=>nc.codigo);
+  const ncResolvedByCodigo=groupBy(state.file2.items.filter(isResolvedStatus), nc=>nc.codigo);
+  const reqByCodigo=groupBy(state.file3.items, r=>r.codigo);
+
+  const consolidated=[]; // linhas expandidas — cada NC e cada requisição aparece em sua própria linha
+  const primaryRows=[]; // uma linha por item (NC/requisição mais recentes) — usada para os indicadores e rankings
+
+  for(const item of state.file1.items){
+    const reqMatches=(reqByCodigo[item.codigo]||[]).slice().sort((a,b)=>(b.dataReq? b.dataReq.getTime():0)-(a.dataReq? a.dataReq.getTime():0));
+    // O saldo do depósito 023 só pode ser comparado com NCs Pendente/Em andamento — uma NC Resolvida
+    // já teve seu saldo retirado do estoque, então não participa dessa conferência.
+    const ncMatches=(ncActiveByCodigo[item.codigo]||[]).slice().sort((a,b)=>(b.dataNC? b.dataNC.getTime():0)-(a.dataNC? a.dataNC.getTime():0));
+    const resolvedNCs=(ncResolvedByCodigo[item.codigo]||[]).slice().sort((a,b)=>(b.dataNC? b.dataNC.getTime():0)-(a.dataNC? a.dataNC.getTime():0));
+    const usedReqIdx=new Set(); // compartilhado entre NCs ativas e resolvidas deste item, evita repetir requisição
+
+    if(ncMatches.length===1){
+      // Caso simples: exatamente 1 NC ativa para o item.
+      const primaryNC=ncMatches[0];
+
+      if(reqMatches.length>1){
+        // Quando há mais de uma requisição para o item, a quantidade da NC deve ser comparada com a
+        // SOMA das requisições (não com uma de cada vez) — se a soma bater, todas pertencem à mesma
+        // NC. Nesse caso, uma única linha é suficiente (não uma por requisição), combinando os
+        // números de requisição, usuários e quantidades na mesma linha.
+        const sumReq=round2(reqMatches.reduce((s,r)=>s+(r.requisitado||0),0));
+        const sumMatches=Math.abs(round2(sumReq-primaryNC.qtde))<0.005;
+        if(sumMatches){
+          const combinedNumReq=reqMatches.map(r=>r.tranReq+' ('+fmtQty(r.requisitado)+(item.um? ' '+item.um:'')+')').join(' + ');
+          const usuariosUnicos=Array.from(new Set(reqMatches.map(r=>r.usuario).filter(Boolean)));
+          const usuarioCombinado=usuariosUnicos.length<=1 ? (usuariosUnicos[0]||'-') : usuariosUnicos.join(' / ');
+          const maisRecente=reqMatches[0];
+          const reqSintetica={tranReq:combinedNumReq, usuario:usuarioCombinado, dataReq:maisRecente.dataReq};
+          const aggNote='Item com '+reqMatches.length+' requisições, quantidade compatível com o registro de NC (soma = '+fmtQty(sumReq)+')';
+          const row=buildRow(item, primaryNC, reqSintetica, aggNote);
+          consolidated.push(row);
+          primaryRows.push(row);
+          reqMatches.forEach((_,ri)=>usedReqIdx.add(ri));
+        } else {
+          // Soma não bate: associa a NC apenas à requisição mais próxima por data; as demais ficam
+          // livres (podem ser usadas pelas NCs Resolvidas, ou sobram no final).
+          let bestIdx=-1, bestDiff=Infinity;
+          reqMatches.forEach((req,ri)=>{
+            if(!primaryNC.dataNC || !req.dataReq) return;
+            const diff=Math.abs(primaryNC.dataNC.getTime()-req.dataReq.getTime());
+            if(diff<bestDiff){ bestDiff=diff; bestIdx=ri; }
+          });
+          if(bestIdx<0 && reqMatches.length) bestIdx=0;
+          const reqForRow = bestIdx>=0 ? reqMatches[bestIdx] : null;
+          if(bestIdx>=0) usedReqIdx.add(bestIdx);
+          const row=buildRow(item, primaryNC, reqForRow, '');
+          consolidated.push(row);
+          primaryRows.push(row);
+        }
+      } else {
+        const reqForRow=reqMatches[0]||null;
+        if(reqForRow) usedReqIdx.add(0);
+        const row=buildRow(item, primaryNC, reqForRow, reqForRow? '' : 'Requisição pendente — saldo ainda não deu entrada no depósito 023');
+        consolidated.push(row);
+        primaryRows.push(row);
+      }
+    } else if(ncMatches.length>1){
+      // Caso com múltiplas NCs ativas para o mesmo item: o saldo do depósito 023 só existe para uma
+      // NC depois que a peça é efetivamente requisitada para lá — por isso, a NC que tem uma
+      // requisição correspondente é a que "confere" (a peça chegou e está no saldo); a(s) NC(s) sem
+      // requisição ainda não tiveram sua peça movida para o 023, então ficam com "Requisição
+      // pendente" (divergência), mesmo que a numeração da NC já exista há mais tempo. Quando mais de
+      // uma NC poderia usar a mesma requisição, a de número mais antigo (sequência do Nº da NC) tem
+      // prioridade, pois é a mais provável de já ter sido processada.
+      const ncIdKey=nc=>{
+        const n=parseFloat(String(nc.id).replace(/[^\d.-]/g,''));
+        return isNaN(n) ? null : n;
+      };
+      const ncByIdAsc=ncMatches.map((nc,ni)=>({nc,ni})).sort((a,b)=>{
+        const ka=ncIdKey(a.nc), kb=ncIdKey(b.nc);
+        if(ka!=null && kb!=null && ka!==kb) return ka-kb;
+        if(ka!=null && kb==null) return -1;
+        if(ka==null && kb!=null) return 1;
+        return (a.nc.dataNC? a.nc.dataNC.getTime():0)-(b.nc.dataNC? b.nc.dataNC.getTime():0);
+      });
+      const matchedReqForNc=new Map();
+      for(const {nc,ni} of ncByIdAsc){
+        let bestIdx=-1, bestDiff=Infinity;
+        reqMatches.forEach((req,ri)=>{
+          if(usedReqIdx.has(ri)) return;
+          const diff=(nc.dataNC && req.dataReq) ? Math.abs(nc.dataNC.getTime()-req.dataReq.getTime()) : Number.MAX_SAFE_INTEGER;
+          if(diff<bestDiff){ bestDiff=diff; bestIdx=ri; }
+        });
+        if(bestIdx>=0){
+          matchedReqForNc.set(ni, bestIdx);
+          usedReqIdx.add(bestIdx);
+        }
+      }
+
+      const primaryReq=reqMatches[0]||null;
+      const pendentes=[];
+      ncMatches.forEach((nc,ni)=>{
+        const reqForRow = matchedReqForNc.has(ni) ? reqMatches[matchedReqForNc.get(ni)] : null;
+        const isConfere = !!reqForRow;
+        let note;
+        if(isConfere){
+          note = ni===0 ? '' : 'Registro de NC do mesmo item ('+(ni+1)+' de '+ncMatches.length+') — saldo dividido entre as NCs';
+        } else {
+          note = 'Requisição pendente — saldo ainda não deu entrada no depósito 023'+(ncMatches.length>1? ' (registro '+(ni+1)+' de '+ncMatches.length+')' : '');
+          pendentes.push(nc);
+        }
+        const allocatedQty = isConfere ? nc.qtde : 0;
+        consolidated.push(buildRow(item, nc, reqForRow, note, allocatedQty));
+      });
+
+      const excess=round2(pendentes.reduce((s,nc)=>s+nc.qtde,0));
+      const anyDivergent=pendentes.length>0;
+      primaryRows.push({
+        codigo:item.codigo, descricao:item.descricao, um:item.um, qtdeDeposito:item.qtdeDeposito,
+        possuiNC:'Sim',
+        numNC:String(ncMatches[0].id), statusNC:ncMatches[0].status, qtdeNC:ncMatches[0].qtde, dataNC:ncMatches[0].dataNC,
+        motivoNC:ncMatches[0].motivo||'',
+        conferencia: anyDivergent? 'divergencia':'confere',
+        diferenca: anyDivergent? -excess : 0,
+        requisicaoEncontrada: !!primaryReq,
+        numRequisicao: primaryReq? primaryReq.tranReq:'', usuario: primaryReq? primaryReq.usuario:'', dataRequisicao: primaryReq? primaryReq.dataReq:null,
+        observacoes:''
+      });
+    }
+
+    if(ncMatches.length===0){
+      if(reqMatches.length===0){
+        // Sem NC ativa e sem requisição: item sem nenhuma informação relevante — desconsiderado do
+        // relatório (nenhuma linha, não entra nos indicadores).
+      } else {
+        // Sem NC ativa, mas há requisição(ões): a(s) requisição(ões) já aparece(m) via o bloco de
+        // "sobras" mais abaixo — aqui só registramos o item para os indicadores, sem duplicar linha.
+        const primeiraReq=reqMatches[0];
+        primaryRows.push({
+          codigo:item.codigo, descricao:item.descricao, um:item.um, qtdeDeposito:item.qtdeDeposito,
+          possuiNC:'Não', numNC:'', statusNC:'', qtdeNC:null, dataNC:null, motivoNC:'',
+          conferencia:'sem_nc', diferenca:null,
+          requisicaoEncontrada:true, numRequisicao:primeiraReq.tranReq, usuario:primeiraReq.usuario, dataRequisicao:primeiraReq.dataReq,
+          observacoes:''
+        });
+      }
+    }
+
+    // NCs Resolvidas: NÃO entram na conferência do saldo do depósito (o saldo já foi retirado).
+    // Servem apenas para confirmar, contra o relatório de requisições, que a retirada foi
+    // corretamente registrada — por isso usam só as requisições que sobraram (não usadas acima).
+    // Quando não há requisição correspondente, a NC Resolvida é desconsiderada (não aparece no relatório).
+    resolvedNCs.forEach(nc=>{
+      let bestIdx=-1, bestDiff=Infinity;
+      reqMatches.forEach((req,ri)=>{
+        if(usedReqIdx.has(ri)) return;
+        if(!nc.dataNC || !req.dataReq) return;
+        const diff=Math.abs(nc.dataNC.getTime()-req.dataReq.getTime());
+        if(diff<bestDiff){ bestDiff=diff; bestIdx=ri; }
+      });
+      if(bestIdx>=0){
+        usedReqIdx.add(bestIdx);
+        consolidated.push(buildResolvedRow(item, nc, reqMatches[bestIdx],
+          'NC Resolvida — requisição correspondente encontrada, registro validado (não considerada no saldo do depósito 023)'));
+      }
+    });
+
+    // Requisições que sobraram sem nenhuma NC (ativa ou resolvida) associada viram linhas próprias.
+    reqMatches.forEach((req,ri)=>{
+      if(usedReqIdx.has(ri)) return;
+      consolidated.push(buildRow(item, null, req, 'Requisição adicional deste item, sem NC associada nesta linha'));
+    });
+  }
+
+  const total=primaryRows.length;
+  const comNC=primaryRows.filter(x=>x.possuiNC==='Sim').length;
+  const semNC=total-comNC;
+  const divergencia=primaryRows.filter(x=>x.conferencia==='divergencia').length;
+  const correto=primaryRows.filter(x=>x.conferencia==='confere').length;
+  const usuarios=new Set(primaryRows.filter(x=>x.requisicaoEncontrada && x.usuario && x.usuario!=='-').map(x=>x.usuario)).size;
+  const semRequisicao=primaryRows.filter(x=>!x.requisicaoEncontrada).length;
+  const pctConformidade = total? round2(correto/total*100) : 0;
+  const pctDivergencia = total? round2(divergencia/total*100) : 0;
+
+  state.consolidated=consolidated;
+  state.primaryRows=primaryRows;
+  state.stats={total,comNC,semNC,divergencia,correto,usuarios,semRequisicao,pctConformidade,pctDivergencia};
+}
+
+/* ===================== RENDER: DASHBOARD ===================== */
+function renderDashboard(){
+  const s=state.stats;
+  const ICONS={
+    total:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>',
+    comnc:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>',
+    semnc:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg>',
+    div:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 2l4 4-4 4"/><path d="M3 12v-2a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 12v2a4 4 0 0 1-4 4H3"/></svg>',
+    ok:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/></svg>',
+    user:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>',
+    semreq:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M12 12v4M12 18.5h.01"/></svg>',
+  };
+  const cards=[
+    {cls:'k-total', icon:ICONS.total, label:'Total de itens analisados', value:s.total},
+    {cls:'k-comnc', icon:ICONS.comnc, label:'Itens com NC', value:s.comNC},
+    {cls:'k-semnc', icon:ICONS.semnc, label:'Itens sem NC', value:s.semNC},
+    {cls:'k-div', icon:ICONS.div, label:'Itens com divergência de quantidade', value:s.divergencia},
+    {cls:'k-ok', icon:ICONS.ok, label:'Quantidades corretas', value:s.correto},
+    {cls:'k-user', icon:ICONS.user, label:'Usuários encontrados', value:s.usuarios},
+    {cls:'k-semreq', icon:ICONS.semreq, label:'Requisições não localizadas', value:s.semRequisicao}
+  ];
+  document.getElementById('dashboardGrid').innerHTML=cards.map(c=>
+    '<div class="kpi-card '+c.cls+'"><div class="kpi-icon">'+c.icon+'</div><div class="kpi-value">'+c.value.toLocaleString('pt-BR')+'</div><div class="kpi-label">'+c.label+'</div></div>'
+  ).join('');
+  document.getElementById('dashSub').textContent='Depósito: '+state.file1.name+' · NC: '+state.file2.name+' · Requisições: '+state.file3.name;
+  document.getElementById('headerMeta').innerHTML='Última análise<br>'+new Date().toLocaleString('pt-BR');
+}
+
+/* ===================== FILTERS ===================== */
+function populateFilterOptions(){
+  const usuarios=Array.from(new Set(state.consolidated.filter(x=>x.usuario).map(x=>x.usuario))).sort();
+  const sel=document.getElementById('fUsuario');
+  sel.innerHTML='<option value="__all__">Todos</option>'+usuarios.map(u=>'<option value="'+escapeHtml(u)+'">'+escapeHtml(u)+'</option>').join('');
+}
+function applyFilters(){
+  const q=normalize(document.getElementById('fSearch').value);
+  const itemQ=normalize(document.getElementById('fItem').value);
+  const usuario=document.getElementById('fUsuario').value;
+  const nNC=normalize(document.getElementById('fNumNC').value);
+  const statusNC=document.getElementById('fStatusNC').value;
+  const possuiNC=document.getElementById('fPossuiNC').value;
+  const divergencia=document.getElementById('fDivergencia').value;
+  const possuiReq=document.getElementById('fPossuiReq').value;
+  const dfVal=document.getElementById('fDateFrom').value;
+  const dtVal=document.getElementById('fDateTo').value;
+  const dateFrom=dfVal? new Date(dfVal+'T00:00:00') : null;
+  const dateTo=dtVal? new Date(dtVal+'T23:59:59') : null;
+
+  state.filtered=state.consolidated.filter(item=>{
+    if(itemQ && !(normalize(item.codigo).indexOf(itemQ)>=0 || normalize(item.descricao).indexOf(itemQ)>=0)) return false;
+    if(usuario!=='__all__' && item.usuario!==usuario) return false;
+    if(nNC && normalize(String(item.numNC||'')).indexOf(nNC)<0) return false;
+    if(statusNC!=='__all__' && normalize(item.statusNC)!==normalize(statusNC)) return false;
+    if(possuiNC!=='__all__' && item.possuiNC!==possuiNC) return false;
+    if(divergencia!=='__all__'){
+      const isDiv=item.conferencia==='divergencia';
+      if(divergencia==='Sim' && !isDiv) return false;
+      if(divergencia==='Não' && isDiv) return false;
+    }
+    if(possuiReq!=='__all__'){
+      if(possuiReq==='Sim' && !item.requisicaoEncontrada) return false;
+      if(possuiReq==='Não' && item.requisicaoEncontrada) return false;
+    }
+    if(dateFrom && (!item.dataRequisicao || item.dataRequisicao<dateFrom)) return false;
+    if(dateTo && (!item.dataRequisicao || item.dataRequisicao>dateTo)) return false;
+    if(q){
+      const hay=normalize([item.codigo,item.descricao,item.usuario,item.numNC,item.numRequisicao].join(' '));
+      if(hay.indexOf(q)<0) return false;
+    }
+    return true;
+  });
+
+  if(state.sort.key){
+    const {key,dir}=state.sort;
+    state.filtered.sort((a,b)=>{
+      let va=a[key], vb=b[key];
+      if(va instanceof Date) va=va? va.getTime():0;
+      if(vb instanceof Date) vb=vb? vb.getTime():0;
+      if(typeof va==='string') va=va.toLowerCase();
+      if(typeof vb==='string') vb=vb.toLowerCase();
+      if(va==null) va='';
+      if(vb==null) vb='';
+      if(va<vb) return dir==='asc'?-1:1;
+      if(va>vb) return dir==='asc'?1:-1;
+      return 0;
+    });
+  }
+  state.page=1;
+  renderTable();
+  renderActiveChips();
+}
+
+function renderActiveChips(){
+  const wrap=document.getElementById('activeChips');
+  if(!wrap) return;
+  const chips=[];
+  const addChip=(label, fieldId, displayValue)=>chips.push({label:label+': '+displayValue, fieldId});
+  const v=id=>document.getElementById(id).value;
+
+  if(v('fSearch')) addChip('Busca','fSearch',v('fSearch'));
+  if(v('fItem')) addChip('Item/Código','fItem',v('fItem'));
+  if(v('fUsuario')!=='__all__') addChip('Usuário','fUsuario',v('fUsuario'));
+  if(v('fNumNC')) addChip('Nº NC','fNumNC',v('fNumNC'));
+  if(v('fStatusNC')!=='__all__') addChip('Status NC','fStatusNC',v('fStatusNC'));
+  if(v('fPossuiNC')!=='__all__') addChip('Possui NC','fPossuiNC',v('fPossuiNC'));
+  if(v('fDivergencia')!=='__all__') addChip('Divergência','fDivergencia',v('fDivergencia'));
+  if(v('fPossuiReq')!=='__all__') addChip('Possui requisição','fPossuiReq',v('fPossuiReq'));
+  if(v('fDateFrom')) addChip('De','fDateFrom',v('fDateFrom'));
+  if(v('fDateTo')) addChip('Até','fDateTo',v('fDateTo'));
+
+  if(!chips.length){ wrap.innerHTML=''; return; }
+  const closeIcon='<svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+  wrap.innerHTML = '<span style="font-size:11.5px; color:var(--ink-muted); font-weight:600; align-self:center;">'+chips.length+' filtro(s) ativo(s):</span>' +
+    chips.map(c=>'<span class="chip-filter">'+escapeHtml(c.label)+'<button data-field="'+c.fieldId+'" title="Remover filtro">'+closeIcon+'</button></span>').join('');
+}
+document.getElementById('activeChips') && document.getElementById('activeChips').addEventListener('click', e=>{
+  const btn=e.target.closest('button[data-field]');
+  if(!btn) return;
+  const el=document.getElementById(btn.dataset.field);
+  if(!el) return;
+  el.value = el.tagName==='SELECT' ? '__all__' : '';
+  applyFilters();
+});
+
+/* ===================== TABLE ===================== */
+function conferenciaBadge(c){
+  const dot='<svg viewBox="0 0 24 24" width="8" height="8"><circle cx="12" cy="12" r="10" fill="currentColor"/></svg>';
+  const check='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 13l4 4L19 7"/></svg>';
+  const warn='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 8v4M12 16h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>';
+  if(c==='confere') return '<span class="badge badge-green">'+dot+' Confere</span>';
+  if(c==='divergencia') return '<span class="badge badge-amber">'+dot+' Divergência</span>';
+  if(c==='resolvida_ok') return '<span class="badge badge-blue">'+check+' Resolvida — Req. OK</span>';
+  if(c==='resolvida_sem_req') return '<span class="badge badge-amber">'+warn+' Resolvida sem Req.</span>';
+  return '<span class="badge badge-red">'+dot+' Sem NC</span>';
+}
+function rowClass(c){
+  if(c==='confere') return 'row-ok';
+  if(c==='divergencia') return 'row-div';
+  if(c==='resolvida_ok') return 'row-resolved';
+  if(c==='resolvida_sem_req') return 'row-div';
+  return 'row-semnc';
+}
+function renderTable(){
+  const tbody=document.getElementById('tableBody');
+  const total=state.filtered.length;
+  const pageSize=state.pageSize;
+  const maxPage=Math.max(1, Math.ceil(total/pageSize));
+  if(state.page>maxPage) state.page=maxPage;
+  const start=(state.page-1)*pageSize;
+  const pageItems=state.filtered.slice(start, start+pageSize);
+
+  if(total===0){
+    tbody.innerHTML='<tr><td colspan="13"><div class="empty-state">Nenhum item encontrado com os filtros aplicados.</div></td></tr>';
+  } else {
+    tbody.innerHTML=pageItems.map(i=>{
+      const diffTxt = i.diferenca==null ? '-' : (i.diferenca>0? '+':'') + fmtQty(i.diferenca);
+      const reqTxt = i.requisicaoEncontrada ? escapeHtml(i.numRequisicao) : 'Requisição não encontrada';
+      const isExtra = !!(i.observacoes && i.observacoes.indexOf('Registro adicional')===0);
+      const codeCell = isExtra ? ('<span style="opacity:.55;">↳ </span>'+escapeHtml(i.codigo)) : escapeHtml(i.codigo);
+      return '<tr class="'+rowClass(i.conferencia)+(isExtra?' row-extra':'')+'">'+
+        '<td class="code-cell">'+codeCell+'</td>'+
+        '<td class="wrap">'+escapeHtml(i.descricao)+'</td>'+
+        '<td>'+fmtQty(i.qtdeDeposito)+' '+escapeHtml(i.um||'')+'</td>'+
+        '<td>'+(i.possuiNC==='Sim' ? '<span class="badge badge-green">Sim</span>' : '<span class="badge badge-red">Não</span>')+'</td>'+
+        '<td class="code-cell">'+escapeHtml(i.numNC||'-')+'</td>'+
+        '<td>'+escapeHtml(i.statusNC||'-')+'</td>'+
+        '<td>'+(i.qtdeNC==null? '-' : fmtQty(i.qtdeNC))+'</td>'+
+        '<td>'+conferenciaBadge(i.conferencia)+'</td>'+
+        '<td>'+diffTxt+'</td>'+
+        '<td class="code-cell wrap">'+reqTxt+'</td>'+
+        '<td>'+escapeHtml(i.requisicaoEncontrada? i.usuario : '-')+'</td>'+
+        '<td>'+(i.dataRequisicao? formatDate(i.dataRequisicao): '-')+'</td>'+
+        '<td class="wrap">'+escapeHtml(i.observacoes||'-')+'</td>'+
+      '</tr>';
+    }).join('');
+  }
+
+  document.getElementById('tableSub').textContent = total.toLocaleString('pt-BR')+' de '+state.consolidated.length.toLocaleString('pt-BR')+' registros exibidos (itens podem aparecer em mais de uma linha quando têm múltiplas NCs ou requisições)';
+  document.getElementById('pageInfo').textContent = total===0 ? '0 resultados' : ('Mostrando '+(start+1)+'–'+Math.min(start+pageSize,total)+' de '+total.toLocaleString('pt-BR'));
+  document.getElementById('pageNum').textContent = state.page+' / '+maxPage;
+  document.getElementById('btnPrev').disabled = state.page<=1;
+  document.getElementById('btnNext').disabled = state.page>=maxPage;
+
+  document.querySelectorAll('#dataTable thead th').forEach(th=>{
+    th.querySelector('.arrow')?.remove();
+    if(th.dataset.key===state.sort.key){
+      const arrow=document.createElement('span');
+      arrow.className='arrow';
+      arrow.textContent = state.sort.dir==='asc' ? '▲' : '▼';
+      th.appendChild(arrow);
+    }
+  });
+}
+document.querySelectorAll('#dataTable thead th').forEach(th=>{
+  th.addEventListener('click', ()=>{
+    const key=th.dataset.key;
+    if(state.sort.key===key){ state.sort.dir = state.sort.dir==='asc' ? 'desc':'asc'; }
+    else { state.sort.key=key; state.sort.dir='asc'; }
+    applyFilters();
+  });
+});
+document.getElementById('pageSize').addEventListener('change', e=>{
+  state.pageSize=parseInt(e.target.value,10); state.page=1; renderTable();
+});
+document.getElementById('btnPrev').addEventListener('click', ()=>{ if(state.page>1){state.page--; renderTable();} });
+document.getElementById('btnNext').addEventListener('click', ()=>{ state.page++; renderTable(); });
+
+['fSearch','fItem','fUsuario','fNumNC','fStatusNC','fPossuiNC','fDivergencia','fPossuiReq','fDateFrom','fDateTo'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', applyFilters);
+  document.getElementById(id).addEventListener('change', applyFilters);
+});
+document.getElementById('btnClearFilters').addEventListener('click', ()=>{
+  document.getElementById('fSearch').value='';
+  document.getElementById('fItem').value='';
+  document.getElementById('fUsuario').value='__all__';
+  document.getElementById('fNumNC').value='';
+  document.getElementById('fStatusNC').value='__all__';
+  document.getElementById('fPossuiNC').value='__all__';
+  document.getElementById('fDivergencia').value='__all__';
+  document.getElementById('fPossuiReq').value='__all__';
+  document.getElementById('fDateFrom').value='';
+  document.getElementById('fDateTo').value='';
+  applyFilters();
+});
+
+/* ===================== SUMMARY ===================== */
+function renderSummary(){
+  const s=state.stats;
+  document.getElementById('summaryStats').innerHTML=[
+    ['Total de itens', s.total],
+    ['Total com NC', s.comNC],
+    ['Total sem NC', s.semNC],
+    ['Total com divergência', s.divergencia],
+    ['Total sem requisição', s.semRequisicao],
+    ['Quantidades corretas', s.correto],
+    ['Percentual de conformidade', s.pctConformidade+'%'],
+    ['Percentual de divergência', s.pctDivergencia+'%']
+  ].map(([label,value])=>'<div class="stat-box"><div class="stat-label">'+label+'</div><div class="stat-value">'+value+'</div></div>').join('');
+
+  const circumference=2*Math.PI*46;
+  const offset=circumference*(1-s.pctConformidade/100);
+  const arc=document.getElementById('gaugeArc');
+  arc.setAttribute('stroke-dasharray', circumference.toFixed(1));
+  arc.setAttribute('stroke-dashoffset', offset.toFixed(1));
+  arc.setAttribute('stroke', s.pctConformidade>=80? '#128A46' : (s.pctConformidade>=50? '#B45309' : '#B42318'));
+  document.getElementById('gaugeVal').textContent=s.pctConformidade+'%';
+
+  // Ranking usuários (a partir de todas as requisições carregadas)
+  const countByUser={};
+  state.file3.items.forEach(r=>{
+    const u=r.usuario||'Não informado';
+    countByUser[u]=(countByUser[u]||0)+1;
+  });
+  const rankUsers=Object.entries(countByUser).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  document.getElementById('rankUsuarios').innerHTML = rankUsers.length ?
+    rankUsers.map(([u,c])=>'<li><span class="r-name">'+escapeHtml(u)+'</span><span class="r-count">'+c+'</span></li>').join('') :
+    '<li>Nenhuma requisição encontrada.</li>';
+
+  // Itens com maior divergência
+  const divs=state.primaryRows.filter(x=>x.conferencia==='divergencia').slice().sort((a,b)=>Math.abs(b.diferenca)-Math.abs(a.diferenca)).slice(0,10);
+  document.getElementById('rankDivergencia').innerHTML = divs.length ?
+    divs.map(i=>'<li><span class="r-name">'+escapeHtml(i.codigo)+'<small>'+escapeHtml(i.descricao.slice(0,42))+'</small></span><span class="r-count">'+(i.diferenca>0?'+':'')+fmtQty(i.diferenca)+'</span></li>').join('') :
+    '<li>Nenhuma divergência encontrada.</li>';
+
+  // Itens sem NC
+  const semNCList=state.primaryRows.filter(x=>x.possuiNC==='Não');
+  document.getElementById('rankSemNC').innerHTML = semNCList.slice(0,10).map(i=>
+    '<li><span class="r-name">'+escapeHtml(i.codigo)+'<small>'+escapeHtml(i.descricao.slice(0,42))+'</small></span><span class="r-count">'+fmtQty(i.qtdeDeposito)+'</span></li>'
+  ).join('') || '<li>Todos os itens possuem NC.</li>';
+  document.getElementById('rankSemNCNote').textContent = semNCList.length>10 ? ('+ '+(semNCList.length-10)+' outros itens sem NC') : '';
+
+  // Itens sem requisição
+  const semReqList=state.primaryRows.filter(x=>!x.requisicaoEncontrada);
+  document.getElementById('rankSemReq').innerHTML = semReqList.slice(0,10).map(i=>
+    '<li><span class="r-name">'+escapeHtml(i.codigo)+'<small>'+escapeHtml(i.descricao.slice(0,42))+'</small></span><span class="r-count">'+fmtQty(i.qtdeDeposito)+'</span></li>'
+  ).join('') || '<li>Todos os itens possuem requisição.</li>';
+  document.getElementById('rankSemReqNote').textContent = semReqList.length>10 ? ('+ '+(semReqList.length-10)+' outros itens sem requisição') : '';
+}
+
+/* ===================== EXPORT ===================== */
+function buildExportTable(){
+  const headers=['Item','Descrição','Qtde Depósito','Possui NC','Nº NC','Status NC','Qtde NC','Conferência','Diferença','Nº Requisição','Usuário','Data Requisição','Observações'];
+  const data=state.filtered.map(i=>[
+    i.codigo, i.descricao, fmtQty(i.qtdeDeposito), i.possuiNC, i.numNC||'-', i.statusNC||'-',
+    i.qtdeNC==null? '-' : fmtQty(i.qtdeNC), conferenciaLabel(i.conferencia),
+    i.diferenca==null? '-' : ((i.diferenca>0?'+':'')+fmtQty(i.diferenca)),
+    i.requisicaoEncontrada? i.numRequisicao : 'Requisição não encontrada',
+    i.requisicaoEncontrada? i.usuario : '-',
+    i.dataRequisicao? formatDate(i.dataRequisicao) : '-',
+    i.observacoes || '-'
+  ]);
+  return {headers, data};
+}
+async function exportExcel(){
+  if(!state.filtered.length){ alert('Não há dados para exportar com os filtros atuais.'); return; }
+  await ensureLib('xlsx');
+  const {headers, data}=buildExportTable();
+  const wb=XLSX.utils.book_new();
+  const wsData=XLSX.utils.aoa_to_sheet([headers, ...data]);
+  wsData['!cols']=headers.map(()=>({wch:18}));
+  XLSX.utils.book_append_sheet(wb, wsData, 'Análise');
+  const s=state.stats;
+  const resumo=[
+    ['Resumo Executivo — Análise Cruzada Depósito 023'],
+    ['Gerado em', new Date().toLocaleString('pt-BR')],
+    [],
+    ['Total de itens analisados', s.total],
+    ['Itens com NC', s.comNC],
+    ['Itens sem NC', s.semNC],
+    ['Itens com divergência de quantidade', s.divergencia],
+    ['Quantidades corretas', s.correto],
+    ['Usuários encontrados', s.usuarios],
+    ['Requisições não localizadas', s.semRequisicao],
+    ['Percentual de conformidade', s.pctConformidade+'%'],
+    ['Percentual de divergência', s.pctDivergencia+'%']
+  ];
+  const wsResumo=XLSX.utils.aoa_to_sheet(resumo);
+  XLSX.utils.book_append_sheet(wb, wsResumo, 'Resumo');
+  XLSX.writeFile(wb, 'Analise_Deposito_023.xlsx');
+}
+function exportWord(){
+  if(!state.filtered.length){ alert('Não há dados para exportar com os filtros atuais.'); return; }
+  const {headers, data}=buildExportTable();
+  const s=state.stats;
+  let html='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">';
+  html+='<head><meta charset="utf-8"><title>Análise Cruzada - Depósito 023</title></head><body style="font-family:Calibri,Arial,sans-serif;">';
+  html+='<h1 style="color:#0B3F27;">Análise Cruzada - Depósito 023</h1>';
+  html+='<p style="color:#555;">Validação Automática entre Estoque, Não Conformidades e Requisições<br>Gerado em '+new Date().toLocaleString('pt-BR')+'</p>';
+  html+='<h2>Resumo Executivo</h2>';
+  html+='<table border="1" cellspacing="0" cellpadding="4" style="border-collapse:collapse;font-size:11pt;">';
+  html+='<tr><td><b>Total de itens</b></td><td>'+s.total+'</td><td><b>Total com NC</b></td><td>'+s.comNC+'</td></tr>';
+  html+='<tr><td><b>Total sem NC</b></td><td>'+s.semNC+'</td><td><b>Total com divergência</b></td><td>'+s.divergencia+'</td></tr>';
+  html+='<tr><td><b>Total sem requisição</b></td><td>'+s.semRequisicao+'</td><td><b>Quantidades corretas</b></td><td>'+s.correto+'</td></tr>';
+  html+='<tr><td><b>% Conformidade</b></td><td>'+s.pctConformidade+'%</td><td><b>% Divergência</b></td><td>'+s.pctDivergencia+'%</td></tr>';
+  html+='</table>';
+  html+='<h2>Tabela Consolidada</h2>';
+  html+='<table border="1" cellspacing="0" cellpadding="4" style="border-collapse:collapse;font-size:9pt;">';
+  html+='<tr>'+headers.map(h=>'<th style="background:#0B3F27;color:#fff;">'+escapeHtml(h)+'</th>').join('')+'</tr>';
+  html+=data.map(row=>'<tr>'+row.map(c=>'<td>'+escapeHtml(String(c))+'</td>').join('')+'</tr>').join('');
+  html+='</table></body></html>';
+  const blob=new Blob(['\ufeff', html], {type:'application/msword'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='Analise_Deposito_023.doc';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+async function exportPdf(){
+  if(!state.filtered.length){ alert('Não há dados para exportar com os filtros atuais.'); return; }
+  await ensureLib('jspdf');
+  await ensureLib('autotable');
+  const {headers, data}=buildExportTable();
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'landscape', unit:'pt', format:'a4'});
+  doc.setFontSize(14);
+  doc.text('Análise Cruzada - Depósito 023', 30, 30);
+  doc.setFontSize(9);
+  doc.setTextColor(100);
+  doc.text('Validação Automática entre Estoque, Não Conformidades e Requisições — Gerado em '+new Date().toLocaleString('pt-BR'), 30, 45);
+  doc.autoTable({
+    startY:58,
+    head:[headers],
+    body:data,
+    styles:{fontSize:6.5, cellPadding:3, overflow:'linebreak'},
+    headStyles:{fillColor:[11,63,39], textColor:255},
+    alternateRowStyles:{fillColor:[247,248,245]},
+    margin:{left:24,right:24},
+    columnStyles:{1:{cellWidth:120}, 12:{cellWidth:100}}
+  });
+  doc.save('Analise_Deposito_023.pdf');
+}
+function wrapExport(fn){
+  return async function(e){
+    const btn=e.currentTarget; const orig=btn.innerHTML;
+    btn.disabled=true;
+    try{ await fn(); }
+    catch(err){ alert('Erro ao exportar: '+err.message); }
+    finally{ btn.disabled=false; btn.innerHTML=orig; }
+  };
+}
+document.getElementById('btnExportExcel').addEventListener('click', wrapExport(exportExcel));
+document.getElementById('btnExportWord').addEventListener('click', wrapExport(exportWord));
+document.getElementById('btnExportPdf').addEventListener('click', wrapExport(exportPdf));
+
+/* ===================== HISTÓRICO DE RELATÓRIOS ===================== */
+function formatDateTime(d){
+  return formatDate(d)+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+}
+async function saveReportToHistory(){
+  const id='r'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
+  const now=new Date();
+  const responsavel=(document.getElementById('fResponsavel').value||'').trim() || '-';
+  const name='Análise Depósito 023 — '+formatDateTime(now);
+  const meta={
+    id, generatedAt:now.toISOString(), name,
+    file1Name:state.file1.name, file2Name:state.file2.name, file3Name:state.file3.name,
+    totalRegistros:state.stats.total,
+    usuarioResponsavel:responsavel,
+    status:'Concluído',
+    stats:state.stats,
+    detailUnavailable:false
+  };
+  try{
+    await storageAdapter.set('report-meta:'+id, JSON.stringify(meta));
+  }catch(e){
+    console.error('Falha ao salvar metadados do relatório no histórico:', e);
+    return;
+  }
+  const dataPayload={
+    consolidated:state.consolidated,
+    primaryRows:state.primaryRows,
+    file1:{name:state.file1.name, items:state.file1.items},
+    file2:{name:state.file2.name, items:state.file2.items},
+    file3:{name:state.file3.name, items:state.file3.items}
+  };
+  try{
+    const dataStr=JSON.stringify(dataPayload);
+    if(dataStr.length > 4.5*1024*1024){
+      throw new Error('dados excedem o limite de armazenamento (arquivo muito grande)');
+    }
+    await storageAdapter.set('report-data:'+id, dataStr);
+  }catch(e){
+    console.warn('Detalhes do relatório não armazenados:', e.message);
+    meta.detailUnavailable=true;
+    try{ await storageAdapter.set('report-meta:'+id, JSON.stringify(meta)); }catch(e2){}
+  }
+  if(responsavel && responsavel!=='-'){
+    try{ await storageAdapter.set('lastResponsavel', responsavel); }catch(e){}
+  }
+  state.currentReportId=id;
+}
+async function loadReportIntoState(id){
+  const metaRes=await storageAdapter.get('report-meta:'+id);
+  if(!metaRes) throw new Error('Relatório não encontrado no histórico.');
+  const meta=JSON.parse(metaRes.value);
+  let dataRes=null;
+  try{ dataRes=await storageAdapter.get('report-data:'+id); }catch(e){ dataRes=null; }
+  if(!dataRes){
+    throw new Error('Os dados detalhados deste relatório não estão disponíveis (o arquivo era grande demais para ser armazenado por completo). Apenas o resumo ficou salvo.');
+  }
+  const dateKeys={dataNC:1, dataRequisicao:1, dataReq:1};
+  const reviver=(k,v)=> (dateKeys[k] && typeof v==='string') ? new Date(v) : v;
+  const data=JSON.parse(dataRes.value, reviver);
+  state.file1={name:data.file1.name, items:data.file1.items};
+  state.file2={name:data.file2.name, items:data.file2.items};
+  state.file3={name:data.file3.name, items:data.file3.items};
+  state.consolidated=data.consolidated;
+  state.primaryRows=data.primaryRows || data.consolidated;
+  state.stats=meta.stats;
+  state.currentReportId=id;
+  return meta;
+}
+async function fetchAllReportMetas(){
+  const listRes=await storageAdapter.list('report-meta:');
+  const keys=(listRes && listRes.keys) || [];
+  const metas=[];
+  for(const k of keys){
+    try{
+      const r=await storageAdapter.get(k);
+      if(r) metas.push(JSON.parse(r.value));
+    }catch(e){ /* ignora entrada corrompida */ }
+  }
+  metas.sort((a,b)=> new Date(b.generatedAt) - new Date(a.generatedAt));
+  return metas;
+}
+async function renderHistoryList(){
+  const tbody=document.getElementById('historyTableBody');
+  const countEl=document.getElementById('historyCount');
+  const noteEl=document.getElementById('historySearchNote');
+  const modeEl=document.getElementById('historyStorageMode');
+  if(modeEl){
+    const okIcon='<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:-2px; margin-right:4px;"><path d="M5 13l4 4L19 7"/></svg>';
+    const warnIcon='<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:-2px; margin-right:4px;"><path d="M12 8v4M12 16h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>';
+    if(STORAGE_MODE==='artifact'){
+      modeEl.className='history-mode-note mode-ok';
+      modeEl.innerHTML=okIcon+'Histórico salvo de forma persistente nesta aplicação.';
+    } else if(STORAGE_MODE==='local'){
+      modeEl.className='history-mode-note mode-ok';
+      modeEl.innerHTML=okIcon+'Histórico salvo no armazenamento deste navegador (persiste neste computador/navegador).';
+    } else {
+      modeEl.className='history-mode-note mode-warn';
+      modeEl.innerHTML=warnIcon+'Nenhum armazenamento persistente disponível neste ambiente — o histórico ficará salvo apenas durante esta sessão e será perdido ao recarregar a página.';
+    }
+  }
+  tbody.innerHTML='<tr><td colspan="7"><div class="history-empty">Carregando histórico…</div></td></tr>';
+  let metas;
+  try{
+    metas=await fetchAllReportMetas();
+  }catch(e){
+    tbody.innerHTML='<tr><td colspan="7"><div class="history-empty">Erro ao carregar histórico: '+escapeHtml(e.message)+'</div></td></tr>';
+    return;
+  }
+
+  const dFromVal=document.getElementById('hDateFrom').value;
+  const dToVal=document.getElementById('hDateTo').value;
+  const dFrom=dFromVal? new Date(dFromVal+'T00:00:00') : null;
+  const dTo=dToVal? new Date(dToVal+'T23:59:59') : null;
+  const qArquivo=normalize(document.getElementById('hArquivo').value);
+  const qStatus=document.getElementById('hStatus').value;
+  const qUsuario=normalize(document.getElementById('hUsuario').value);
+  const qProduto=normalize(document.getElementById('hProduto').value);
+  const qCodigo=normalize(document.getElementById('hCodigo').value);
+  const qMotivo=normalize(document.getElementById('hMotivo').value);
+
+  let filtered=metas.filter(m=>{
+    const gd=new Date(m.generatedAt);
+    if(dFrom && gd<dFrom) return false;
+    if(dTo && gd>dTo) return false;
+    if(qArquivo){
+      const hay=normalize([m.file1Name,m.file2Name,m.file3Name].join(' '));
+      if(hay.indexOf(qArquivo)<0) return false;
+    }
+    if(qStatus!=='__all__' && m.status!==qStatus) return false;
+    if(qUsuario && normalize(m.usuarioResponsavel||'').indexOf(qUsuario)<0) return false;
+    return true;
+  });
+
+  const needsDeepSearch = !!(qProduto || qCodigo || qMotivo);
+  if(needsDeepSearch){
+    noteEl.classList.remove('hidden');
+    const results=[];
+    for(const m of filtered){
+      let data=historyDataCache[m.id];
+      if(data===undefined){
+        try{
+          const r=await storageAdapter.get('report-data:'+m.id);
+          data=r? JSON.parse(r.value) : null;
+        }catch(e){ data=null; }
+        historyDataCache[m.id]=data;
+      }
+      if(!data) continue;
+      const match=data.consolidated.some(item=>{
+        if(qProduto && normalize(item.descricao||'').indexOf(qProduto)<0) return false;
+        if(qCodigo && normalize(item.codigo||'').indexOf(qCodigo)<0) return false;
+        if(qMotivo && normalize(item.motivoNC||'').indexOf(qMotivo)<0) return false;
+        return true;
+      });
+      if(match) results.push(m);
+    }
+    filtered=results;
+    noteEl.classList.add('hidden');
+  } else {
+    noteEl.classList.add('hidden');
+  }
+
+  if(filtered.length===0){
+    const msg = metas.length===0
+      ? 'Nenhum relatório no histórico ainda. Execute uma análise na aba "Nova Análise" para começar.'
+      : 'Nenhum relatório encontrado com os filtros aplicados.';
+    tbody.innerHTML='<tr><td colspan="7"><div class="history-empty">'+msg+'</div></td></tr>';
+  } else {
+    tbody.innerHTML=filtered.map(m=>{
+      const gd=new Date(m.generatedAt);
+      const arquivos=[m.file1Name,m.file2Name,m.file3Name].filter(Boolean).join(' · ');
+      return '<tr>'+
+        '<td>'+formatDateTime(gd)+'</td>'+
+        '<td class="wrap">'+escapeHtml(m.name)+(m.detailUnavailable? ' <span class="badge badge-amber" title="Arquivo grande demais — apenas o resumo foi salvo">resumo</span>' : '')+'</td>'+
+        '<td class="wrap">'+escapeHtml(arquivos)+'</td>'+
+        '<td>'+(m.totalRegistros!=null? m.totalRegistros.toLocaleString('pt-BR') : '-')+'</td>'+
+        '<td>'+escapeHtml(m.usuarioResponsavel||'-')+'</td>'+
+        '<td><span class="badge badge-green">'+escapeHtml(m.status||'Concluído')+'</span></td>'+
+        '<td><div class="history-actions">'+
+          '<button data-act="view" data-id="'+m.id+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg> Visualizar</button>'+
+          '<button data-act="xlsx" data-id="'+m.id+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg> Excel</button>'+
+          '<button data-act="doc" data-id="'+m.id+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg> Word</button>'+
+          '<button data-act="pdf" data-id="'+m.id+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg> PDF</button>'+
+          '<button data-act="del" data-id="'+m.id+'" class="danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg> Excluir</button>'+
+        '</div></td>'+
+      '</tr>';
+    }).join('');
+  }
+  countEl.textContent=filtered.length.toLocaleString('pt-BR')+' de '+metas.length.toLocaleString('pt-BR')+' relatório(s)';
+}
+document.getElementById('historyTableBody').addEventListener('click', async (e)=>{
+  const btn=e.target.closest('button[data-act]');
+  if(!btn) return;
+  const id=btn.dataset.id, act=btn.dataset.act;
+  const originalLabel=btn.textContent;
+  if(act==='del'){
+    if(!confirm('Excluir este relatório do histórico? Esta ação não pode ser desfeita.')) return;
+    try{
+      await storageAdapter.delete('report-meta:'+id);
+      try{ await storageAdapter.delete('report-data:'+id); }catch(e){}
+      delete historyDataCache[id];
+      renderHistoryList();
+    }catch(err){ alert('Erro ao excluir: '+err.message); }
+    return;
+  }
+  btn.disabled=true; btn.textContent='…';
+  try{
+    if(act==='view'){
+      const meta=await loadReportIntoState(id);
+      populateFilterOptions();
+      state.sort={key:null, dir:'asc'};
+      state.filtered=state.consolidated.slice();
+      state.page=1;
+      renderDashboard();
+      renderTable();
+      renderSummary();
+      document.getElementById('resultsWrap').classList.remove('hidden');
+      hideUploadSection();
+      const banner=document.getElementById('historicBanner');
+      banner.classList.remove('hidden');
+      document.getElementById('historicBannerName').textContent=meta.name;
+      document.getElementById('historicBannerDate').textContent='· gerado em '+formatDateTime(new Date(meta.generatedAt));
+      switchTab('analise');
+      document.getElementById('resultsWrap').scrollIntoView({behavior:'smooth', block:'start'});
+    } else if(act==='xlsx' || act==='doc' || act==='pdf'){
+      await loadReportIntoState(id);
+      state.filtered=state.consolidated.slice();
+      if(act==='xlsx') await exportExcel();
+      if(act==='doc') await exportWord();
+      if(act==='pdf') await exportPdf();
+    }
+  }catch(err){
+    alert(err.message);
+  }
+  btn.disabled=false; btn.textContent=originalLabel;
+});
+let historyFilterTimer=null;
+function scheduleHistoryFilter(delay){
+  clearTimeout(historyFilterTimer);
+  historyFilterTimer=setTimeout(renderHistoryList, delay);
+}
+['hDateFrom','hDateTo','hArquivo','hStatus','hUsuario'].forEach(id=>{
+  const el=document.getElementById(id);
+  el.addEventListener('input', ()=>scheduleHistoryFilter(150));
+  el.addEventListener('change', ()=>scheduleHistoryFilter(0));
+});
+['hProduto','hCodigo','hMotivo'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', ()=>scheduleHistoryFilter(500));
+});
+document.getElementById('btnClearHistoryFilters').addEventListener('click', ()=>{
+  ['hDateFrom','hDateTo','hArquivo','hUsuario','hProduto','hCodigo','hMotivo'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('hStatus').value='__all__';
+  renderHistoryList();
+});
+function showUploadSection(){
+  document.getElementById('uploadSection').classList.remove('hidden');
+  document.getElementById('btnNovaAnalise').classList.add('hidden');
+}
+function hideUploadSection(){
+  document.getElementById('uploadSection').classList.add('hidden');
+  document.getElementById('btnNovaAnalise').classList.remove('hidden');
+}
+function resetToNewAnalysis(){
+  state.file1=state.file2=state.file3=null;
+  state.consolidated=[]; state.filtered=[]; state.stats=null; state.currentReportId=null;
+  [1,2,3].forEach(i=>{
+    document.getElementById('input'+i).value='';
+    const st=document.getElementById('status'+i);
+    st.textContent=''; st.className='upload-status';
+    document.getElementById('card'+i).classList.remove('is-success','is-error');
+  });
+  updateExecuteButton();
+  document.getElementById('resultsWrap').classList.add('hidden');
+  document.getElementById('historicBanner').classList.add('hidden');
+  showUploadSection();
+  switchTab('analise');
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+document.getElementById('btnBackToHistory').addEventListener('click', ()=>switchTab('historico'));
+document.getElementById('btnNovaAnaliseFromHistoric').addEventListener('click', resetToNewAnalysis);
+document.getElementById('btnNovaAnalise').addEventListener('click', resetToNewAnalysis);
+(async function initResponsavel(){
+  try{
+    const r=await storageAdapter.get('lastResponsavel');
+    if(r && r.value) document.getElementById('fResponsavel').value=r.value;
+  }catch(e){ /* nenhum valor anterior salvo */ }
+})();
+
+/* ===================== EXECUTE ===================== */
+document.getElementById('btnExecutar').addEventListener('click', async ()=>{
+  try{
+    runAnalysis();
+    populateFilterOptions();
+    state.sort={key:null, dir:'asc'};
+    state.filtered=state.consolidated.slice();
+    state.page=1;
+    state.currentReportId=null;
+    renderDashboard();
+    renderTable();
+    renderSummary();
+    document.getElementById('historicBanner').classList.add('hidden');
+    document.getElementById('resultsWrap').classList.remove('hidden');
+    hideUploadSection();
+    document.getElementById('resultsWrap').scrollIntoView({behavior:'smooth', block:'start'});
+    await saveReportToHistory();
+  }catch(err){
+    alert('Ocorreu um erro ao processar a análise: '+err.message);
+  }
+});
+
+})();
+</script>
+</body>
+</html>
