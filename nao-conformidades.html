@@ -1371,11 +1371,19 @@
     let amostraNota = '';
     if(it.ocorrencias <= 1){
       amostraNota = ' (amostra de apenas 1 ocorrência — monitorar antes de agir de forma definitiva)';
+    } else if(sortedMotivos.length > 1){
+      const outros = sortedMotivos.slice(1).map(([m,c]) => motivoShortCode(m) + ' (' + c + ')').join(', ');
+      amostraNota = ' Este item também teve ' + (sortedMotivos.length-1) + ' outro(s) motivo(s) com menos ocorrências (' + outros + '), não detalhado(s) aqui.';
     }
 
-    const evidenciaCausas = amostrasUnicas(it.causas, 2);
-    const evidenciaObservacoes = amostrasUnicas(it.observacoes, 2);
-    const evidenciaAcoes = amostrasUnicas(it.acoesRegistradas, 2);
+    // A evidência (Causa/Observação registradas) considera SÓ as linhas que tiveram
+    // o motivo mais frequente — assim uma observação de outro motivo (ex.: "gravação
+    // tremida" de um Q15 isolado) não aparece misturada na análise do Q4, que é o
+    // motivo predominante deste item.
+    const bucketTop = it.porMotivo.get(topMotivoFull) || { causas:[], observacoes:[], acoes:[] };
+    const evidenciaCausas = amostrasUnicas(bucketTop.causas, 2);
+    const evidenciaObservacoes = amostrasUnicas(bucketTop.observacoes, 2);
+    const evidenciaAcoes = amostrasUnicas(bucketTop.acoes, 2);
 
     // Prioridade: itens com apenas 1 ocorrência ainda não têm evidência suficiente para
     // ação definitiva (monitorar); itens com volume alto OU causa concentrada em uma única
@@ -1422,15 +1430,17 @@
       if(!bySetor.has(setor)) bySetor.set(setor, { total:0, items:new Map() });
       const s = bySetor.get(setor);
       s.total++;
-      if(!s.items.has(k)) s.items.set(k, { codigo:cod, descricao:desc, ocorrencias:0, unidades: cols.qtde?0:null, motivoCounts:new Map(), origens:new Map(), observacoes:[], causas:[], acoesRegistradas:[] });
+      if(!s.items.has(k)) s.items.set(k, { codigo:cod, descricao:desc, ocorrencias:0, unidades: cols.qtde?0:null, motivoCounts:new Map(), origens:new Map(), porMotivo:new Map() });
       const it = s.items.get(k);
       it.ocorrencias++;
       if(cols.qtde) it.unidades += unidade;
       if(motivo) it.motivoCounts.set(motivo, (it.motivoCounts.get(motivo)||0)+1);
       it.origens.set(origem, (it.origens.get(origem)||0)+1);
-      if(obs) it.observacoes.push(obs);
-      if(causaTexto) it.causas.push(causaTexto);
-      if(acaoTexto) it.acoesRegistradas.push(acaoTexto);
+      if(!it.porMotivo.has(motivo)) it.porMotivo.set(motivo, { causas:[], observacoes:[], acoes:[] });
+      const bucket = it.porMotivo.get(motivo);
+      if(obs) bucket.observacoes.push(obs);
+      if(causaTexto) bucket.causas.push(causaTexto);
+      if(acaoTexto) bucket.acoes.push(acaoTexto);
     });
     const result = [];
     SETOR_ORDER.forEach(setor => {
@@ -1446,9 +1456,7 @@
         it.avaliacao = avaliarItem(it);
         delete it.motivoCounts;
         delete it.origens;
-        delete it.observacoes;
-        delete it.causas;
-        delete it.acoesRegistradas;
+        delete it.porMotivo;
       });
       result.push({ setor, total:s.total, items });
     });
