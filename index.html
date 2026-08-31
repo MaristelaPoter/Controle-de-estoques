@@ -331,6 +331,7 @@
   /* Somente leitura para quem não é administrador */
   body.is-viewer #tabs button[data-view="novo"],
   body.is-viewer #tabs button[data-view="cadastro"],
+  body.is-viewer #tabs button[data-view="revisao"],
   body.is-viewer .row-actions .ok-btn,
   body.is-viewer .row-actions .edit-btn,
   body.is-viewer .row-actions .del-btn,
@@ -395,6 +396,10 @@
       <button class="tab" data-view="pendentes" id="tabPendentes" style="display:none;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
         Pendentes <span class="count" id="countPendentes">0</span>
+      </button>
+      <button class="tab" data-view="revisao" id="tabRevisao" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        Revisão de Estoque <span class="count" id="countRevisao">0</span>
       </button>
       <button class="tab" data-view="aberto">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
@@ -560,6 +565,17 @@
             </div>
           </form>
         </div>
+      </div>
+
+      <!-- ===================== REVISÃO DE ESTOQUE (quantidade atualizada automaticamente) ===================== -->
+      <div class="view" id="view-revisao">
+        <h3 class="section-title">Revisão de Estoque <span class="n" id="nRevisao">0</span></h3>
+        <p class="section-desc">Itens cuja Quantidade foi reduzida automaticamente na última importação da Situação de Estoque (peças provavelmente finalizadas). Ficam separados aqui até você revisar e preencher o campo Atualização — depois disso, voltam sozinhos para "Em Aberto".</p>
+        <div class="filter-panel">
+          <div class="filter-field"><label>Buscar</label><input type="text" id="revisaoKw" placeholder="código, item, setor..."></div>
+          <div class="filter-field"><label>Tipo</label><select id="revisaoTipo"><option value="">Todos</option><option value="retrabalho">Retrabalho</option><option value="nc">Depósito 023</option></select></div>
+        </div>
+        <div id="revisaoTableArea"></div>
       </div>
 
       <!-- ===================== PENDENTES (sem descrição) ===================== -->
@@ -854,6 +870,18 @@
   const state = { registros: [], ncRegistros: [], itens: [], setores: [], editingId: null, editingNcId: null, editingItemCodigo: null, tipoAtual: 'retrabalho' };
 
   function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  // Preserva a posição de rolagem de uma tabela (div.table-wrap) que vai ser
+  // reconstruída via innerHTML — sem isso, qualquer atualização automática
+  // (contagem de dias, sincronização em tempo real) jogaria a rolagem de volta
+  // para o topo enquanto a pessoa está lendo a lista.
+  function getTableScroll(containerId){
+    const box = document.querySelector('#'+containerId+' .table-wrap');
+    return box ? box.scrollTop : 0;
+  }
+  function setTableScroll(containerId, top){
+    const box = document.querySelector('#'+containerId+' .table-wrap');
+    if(box) box.scrollTop = top;
+  }
   function fmtInt(n){ return new Intl.NumberFormat('pt-BR').format(n||0); }
   function qtyNoteHtml(r){
     if(!r.pecasFinalizadas) return '';
@@ -970,8 +998,15 @@
     if(!reg || reg.atualizacao === value) return false;
     reg.atualizacao = value;
     reg.atualizacaoEm = value ? new Date().toISOString() : null;
+    let saiuDaRevisao = false;
+    if(value && reg.pecasFinalizadas){
+      reg.pecasFinalizadas = null;
+      reg.pecasFinalizadasEm = null;
+      saiuDaRevisao = true;
+    }
     pushHistory(reg, value ? ('Atualização registrada: "' + (value.slice(0,60)) + (value.length>60?'…':'') + '"') : 'Atualização removida');
     await persistRegistros();
+    if(saiuDaRevisao){ renderCounts(); renderAberto(); renderRevisao(); }
     return true;
   }
   async function saveAtualizacaoNc(id, value){
@@ -979,8 +1014,15 @@
     if(!reg || reg.atualizacao === value) return false;
     reg.atualizacao = value;
     reg.atualizacaoEm = value ? new Date().toISOString() : null;
+    let saiuDaRevisao = false;
+    if(value && reg.pecasFinalizadas){
+      reg.pecasFinalizadas = null;
+      reg.pecasFinalizadasEm = null;
+      saiuDaRevisao = true;
+    }
     pushHistory(reg, value ? ('Atualização registrada: "' + (value.slice(0,60)) + (value.length>60?'…':'') + '"') : 'Atualização removida');
     await persistNcRegistros();
+    if(saiuDaRevisao){ renderCounts(); renderAberto(); renderRevisao(); }
     return true;
   }
 
@@ -1138,7 +1180,7 @@
       renderSetorSelect();
     }
     await persistItens(); await persistRegistros(); await persistNcRegistros();
-    renderDatalist(); renderCounts(); renderAberto(); renderPendentes();
+    renderDatalist(); renderCounts(); renderAberto(); renderPendentes(); renderRevisao();
 
     const partes = [];
     if(totalNovos) partes.push(totalNovos+' item(ns) importado(s)');
@@ -1307,6 +1349,7 @@
     if(btn) btn.classList.add('active');
     if(name === 'aberto') renderAberto();
     if(name === 'pendentes') renderPendentes();
+    if(name === 'revisao') renderRevisao();
     if(name === 'concluidos') renderConcluidos();
     if(name === 'cadastro') renderCadastros();
     if(name === 'novo') renderChips();
@@ -1548,6 +1591,7 @@
     renderCounts();
     renderAberto();
     renderPendentes();
+    renderRevisao();
   });
 
   document.getElementById('btnCancelEdit').addEventListener('click', () => {
@@ -1603,7 +1647,7 @@
       await persistRegistros();
       toast('Retrabalho concluído.');
     }
-    renderAberto(); renderPendentes(); renderConcluidos(); renderCounts();
+    renderAberto(); renderPendentes(); renderRevisao(); renderConcluidos(); renderCounts();
   }
   async function reabrirItem(kind, id){
     if(!isAdmin) return;
@@ -1622,7 +1666,7 @@
       await persistRegistros();
       toast('Retrabalho reaberto.');
     }
-    renderAberto(); renderPendentes(); renderConcluidos(); renderCounts();
+    renderAberto(); renderPendentes(); renderRevisao(); renderConcluidos(); renderCounts();
   }
   async function excluirItem(kind, id){
     if(!isAdmin) return;
@@ -1638,7 +1682,7 @@
       state.registros = state.registros.filter(r => r.id !== id);
       await persistRegistros();
     }
-    renderAberto(); renderPendentes(); renderConcluidos(); renderCounts();
+    renderAberto(); renderPendentes(); renderRevisao(); renderConcluidos(); renderCounts();
     toast('Registro excluído.');
   }
   function editarItem(kind, id){ startEdit(kind, id); }
@@ -1889,7 +1933,7 @@
     return '<span class="trend '+cls+'">'+seta+' '+Math.abs(delta)+' vs. 7 dias anteriores</span>';
   }
   function renderAberto(){
-    const abertos = combinedList('aberto').filter(r => !!r.desc);
+    const abertos = combinedList('aberto').filter(r => !!r.desc && !r.pecasFinalizadas);
     document.getElementById('nAberto').textContent = abertos.length;
 
     const dias = abertos.map(r => daysBetween(r.dataInicio, todayISO()));
@@ -1919,7 +1963,7 @@
     renderAbertoTable();
   }
   function filteredAberto(){
-    let list = combinedList('aberto').filter(r => !!r.desc);
+    let list = combinedList('aberto').filter(r => !!r.desc && !r.pecasFinalizadas);
     const kw = abertoFilters.kw.trim().toLowerCase();
     const descKw = abertoFilters.descKw.trim().toLowerCase();
     if(abertoFilters.tipo) list = list.filter(r => r.kind === abertoFilters.tipo);
@@ -1943,6 +1987,7 @@
       selectedAberto.clear(); updateBatchBar();
       return;
     }
+    const scrollTop = getTableScroll('abertoTableArea');
     const rows = list.map(r => {
       const dias = daysBetween(r.dataInicio, todayISO());
       const fotoCell = r.kind==='nc' && r.foto ? '<img class="foto-thumb" src="'+r.foto+'" data-foto="'+r.id+'" alt="Foto anexada">' : '<span class="cell-muted">—</span>';
@@ -1961,6 +2006,7 @@
     }).join('');
 
     document.getElementById('abertoTableArea').innerHTML = '<div class="table-wrap scroll-limited"><table><thead><tr><th></th><th>Tipo</th><th>Depósito</th><th>Setor</th><th>Código</th><th>Item</th><th>Descrição</th><th class="num">Qtde.</th><th class="num">Valor Total</th><th>Início</th><th>Dias em Aberto</th><th>Foto</th><th>Atualização</th><th>Ações</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+    setTableScroll('abertoTableArea', scrollTop);
 
     document.getElementById('abertoTableArea').querySelectorAll('button[data-act]').forEach(b => {
       b.addEventListener('click', () => {
@@ -2030,6 +2076,7 @@
       document.getElementById('pendTableArea').innerHTML = '<div class="empty-note">Nenhum item pendente.</div>';
       return;
     }
+    const scrollTop = getTableScroll('pendTableArea');
     const rows = list.map(r => {
       const dias = daysBetween(r.dataInicio, todayISO());
       return '<tr>' +
@@ -2042,6 +2089,7 @@
         '<td class="row-actions"><button class="edit-btn" data-act="editar" data-kind="'+r.kind+'" data-id="'+r.id+'">Preencher descrição</button><button class="history-btn" data-act="historico" data-kind="'+r.kind+'" data-id="'+r.id+'">Histórico</button><button class="del-btn" data-act="excluir" data-kind="'+r.kind+'" data-id="'+r.id+'">Excluir</button></td></tr>';
     }).join('');
     document.getElementById('pendTableArea').innerHTML = '<div class="table-wrap scroll-limited"><table><thead><tr><th>Tipo</th><th>Depósito</th><th>Setor</th><th>Código</th><th>Item</th><th class="num">Qtde.</th><th class="num">Valor Total</th><th>Início</th><th>Dias em Aberto</th><th>Ações</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+    setTableScroll('pendTableArea', scrollTop);
     document.getElementById('pendTableArea').querySelectorAll('button[data-act]').forEach(b => {
       b.addEventListener('click', () => {
         const id = b.dataset.id, kind = b.dataset.kind;
@@ -2052,6 +2100,86 @@
     });
     bindCellClamp(document.getElementById('pendTableArea'));
   }
+  // ================= Revisão de Estoque (quantidade reduzida automaticamente) =================
+  let revisaoFilters = { kw:'', tipo:'' };
+  function combinedListRevisao(){
+    return combinedList('aberto').filter(r => !!r.pecasFinalizadas);
+  }
+  function updateTabRevisaoVisibility(count){
+    const tab = document.getElementById('tabRevisao');
+    tab.style.display = (count > 0 && isAdmin) ? '' : 'none';
+    document.getElementById('countRevisao').textContent = count;
+    // Se a aba estiver ativa e ficar vazia, volta para "Em Aberto".
+    if(count === 0 && document.getElementById('view-revisao').classList.contains('active')){
+      switchView('aberto');
+    }
+  }
+  function filteredRevisao(){
+    let list = combinedListRevisao();
+    const kw = revisaoFilters.kw.trim().toLowerCase();
+    if(revisaoFilters.tipo) list = list.filter(r => r.kind === revisaoFilters.tipo);
+    if(kw) list = list.filter(r => (r.codigo+' '+r.descricaoItem+' '+r.setor).toLowerCase().includes(kw));
+    list.sort((a,b) => daysBetween(b.dataInicio, todayISO()) - daysBetween(a.dataInicio, todayISO()));
+    return list;
+  }
+  function renderRevisao(){
+    const list = combinedListRevisao();
+    document.getElementById('nRevisao').textContent = list.length;
+    document.getElementById('revisaoKw').value = revisaoFilters.kw;
+    document.getElementById('revisaoTipo').value = revisaoFilters.tipo;
+    renderRevisaoTable();
+  }
+  function renderRevisaoTable(){
+    const list = filteredRevisao();
+    if(!list.length){
+      document.getElementById('revisaoTableArea').innerHTML = '<div class="empty-note">Nenhum item aguardando revisão.</div>';
+      return;
+    }
+    const scrollTop = getTableScroll('revisaoTableArea');
+    const rows = list.map(r => {
+      const dias = daysBetween(r.dataInicio, todayISO());
+      const fotoCell = r.kind==='nc' && r.foto ? '<img class="foto-thumb" src="'+r.foto+'" data-foto="'+r.id+'" alt="Foto anexada">' : '<span class="cell-muted">—</span>';
+      const tsAtualizacao = r.atualizacaoEm ? '<div class="atualizacao-ts" data-id="'+r.id+'" style="font-size:10px;color:var(--ink-faint);margin-top:3px;">Atualizado em '+esc(fmtDateTimeBR(r.atualizacaoEm))+'</div>' : '<div class="atualizacao-ts" data-id="'+r.id+'"></div>';
+      return '<tr><td><span class="badge '+(r.kind==='nc'?'dias-atencao':'dias-ok')+'">'+esc(r.tipoLabel)+'</span></td><td style="font-family:var(--mono);">'+esc(r.deposito||'—')+'</td><td>'+esc(r.setor)+'</td><td style="font-family:var(--mono);">'+esc(r.codigo)+'</td>' +
+        '<td><div class="cell-clamp" data-label="Descrição do Item" title="'+esc(r.descricaoItem)+'">'+esc(r.descricaoItem)+'</div></td>' +
+        '<td><div class="cell-clamp" data-label="Descrição" title="'+esc(r.desc)+'">'+esc(r.desc)+'</div></td>' +
+        '<td class="num">'+(r.quantidade!=null?fmtInt(r.quantidade):'—')+qtyNoteHtml(r)+'</td>' +
+        '<td class="num">'+fmtBRL(r.valorUnitario!=null && r.quantidade!=null ? r.valorUnitario*r.quantidade : null)+'</td>' +
+        '<td>'+fmtDateBR(r.dataInicio)+'</td>' +
+        '<td><span class="badge '+diasBadgeClass(dias)+'">'+dias+' dia'+(dias===1?'':'s')+'</span></td>' +
+        '<td>'+fotoCell+'</td>' +
+        '<td><textarea class="atualizacao-cell" data-kind="'+r.kind+'" data-id="'+r.id+'" placeholder="Sem atualização"'+(isAdmin?'':' readonly')+'>'+esc(r.atualizacao||'')+'</textarea>'+tsAtualizacao+'</td>' +
+        '<td class="row-actions"><button class="ok-btn" data-act="concluir" data-kind="'+r.kind+'" data-id="'+r.id+'">Concluir</button><button class="edit-btn" data-act="editar" data-kind="'+r.kind+'" data-id="'+r.id+'">Editar</button><button class="history-btn" data-act="historico" data-kind="'+r.kind+'" data-id="'+r.id+'">Histórico</button><button class="del-btn" data-act="excluir" data-kind="'+r.kind+'" data-id="'+r.id+'">Excluir</button></td></tr>';
+    }).join('');
+    document.getElementById('revisaoTableArea').innerHTML = '<div class="table-wrap scroll-limited"><table><thead><tr><th>Tipo</th><th>Depósito</th><th>Setor</th><th>Código</th><th>Item</th><th>Descrição</th><th class="num">Qtde.</th><th class="num">Valor Total</th><th>Início</th><th>Dias em Aberto</th><th>Foto</th><th>Atualização</th><th>Ações</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+    setTableScroll('revisaoTableArea', scrollTop);
+    document.getElementById('revisaoTableArea').querySelectorAll('button[data-act]').forEach(b => {
+      b.addEventListener('click', () => {
+        const id = b.dataset.id, kind = b.dataset.kind;
+        if(b.dataset.act === 'concluir') concluirItem(kind, id);
+        else if(b.dataset.act === 'editar') editarItem(kind, id);
+        else if(b.dataset.act === 'excluir') excluirItem(kind, id);
+        else if(b.dataset.act === 'historico') showHistory(kind, id);
+      });
+    });
+    document.getElementById('revisaoTableArea').querySelectorAll('img[data-foto]').forEach(img => {
+      img.addEventListener('click', () => {
+        modalTitle.textContent = 'Foto anexada';
+        modalBody.innerHTML = '<img src="'+img.src+'" style="width:100%; border-radius:8px;">';
+        modalActions.innerHTML = '';
+        const btnClose = document.createElement('button');
+        btnClose.className = 'btn-ghost'; btnClose.textContent = 'Fechar';
+        btnClose.addEventListener('click', closeModal);
+        modalActions.appendChild(btnClose);
+        modalBackdrop.classList.add('show');
+      });
+    });
+    bindAtualizacaoCells(document.getElementById('revisaoTableArea'));
+    bindCellClamp(document.getElementById('revisaoTableArea'));
+  }
+  document.getElementById('revisaoKw').addEventListener('input', e => { revisaoFilters.kw = e.target.value; renderRevisaoTable(); });
+  document.getElementById('revisaoTipo').addEventListener('change', e => { revisaoFilters.tipo = e.target.value; renderRevisaoTable(); });
+
   document.getElementById('pendKw').addEventListener('input', e => { pendFilters.kw = e.target.value; renderPendentesTable(); });
   document.getElementById('pendTipo').addEventListener('change', e => { pendFilters.tipo = e.target.value; renderPendentesTable(); });
 
@@ -2136,6 +2264,7 @@
     const list = filteredConc();
     if(!list.length){ document.getElementById('concTableArea').innerHTML = '<div class="empty-note">Nenhum registro concluído ainda.</div>'; return; }
 
+    const scrollTop = getTableScroll('concTableArea');
     const rows = list.map(r => {
       const dias = daysBetween(r.dataInicio, r.dataConclusao);
       const fotoCell = r.kind==='nc' && r.foto ? '<img class="foto-thumb" src="'+r.foto+'" data-foto="'+r.id+'" alt="Foto anexada">' : '<span class="cell-muted">—</span>';
@@ -2152,6 +2281,7 @@
     }).join('');
 
     document.getElementById('concTableArea').innerHTML = '<div class="table-wrap scroll-limited"><table><thead><tr><th>Tipo</th><th>Depósito</th><th>Setor</th><th>Código</th><th>Item</th><th>Descrição</th><th class="num">Qtde.</th><th class="num">Valor Total</th><th>Início</th><th>Conclusão</th><th>Dias Totais</th><th>Foto</th><th>Atualização</th><th>Ações</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+    setTableScroll('concTableArea', scrollTop);
 
     document.getElementById('concTableArea').querySelectorAll('button[data-act]').forEach(b => {
       b.addEventListener('click', () => {
@@ -2316,13 +2446,16 @@
   // ================= Contadores da sidebar / topbar =================
   function renderCounts(){
     const pendentesCount = combinedListPendentes().length;
+    const revisaoCount = combinedListRevisao().length;
     const abertosRetra = state.registros.filter(r=>r.status==='aberto').length;
     const abertosNc = state.ncRegistros.filter(r=>r.status==='aberto').length;
-    document.getElementById('countAberto').textContent = (abertosRetra + abertosNc) - pendentesCount;
+    const excluidosDoAberto = combinedList('aberto').filter(r => !r.desc || r.pecasFinalizadas).length;
+    document.getElementById('countAberto').textContent = (abertosRetra + abertosNc) - excluidosDoAberto;
     const concRetra = state.registros.filter(r=>r.status==='concluido').length;
     const concNc = state.ncRegistros.filter(r=>r.status==='concluido').length;
     document.getElementById('countConc').textContent = concRetra + concNc;
     updateTabPendentesVisibility(pendentesCount);
+    updateTabRevisaoVisibility(revisaoCount);
   }
 
   // ================= Relógio / data de hoje =================
@@ -2346,6 +2479,10 @@
     if(document.activeElement && document.activeElement.classList && document.activeElement.classList.contains('atualizacao-cell')) return;
     renderPendentes();
   }
+  function safeRerenderRevisao(){
+    if(document.activeElement && document.activeElement.classList && document.activeElement.classList.contains('atualizacao-cell')) return;
+    renderRevisao();
+  }
 
   // ================= Init =================
   async function init(){
@@ -2357,6 +2494,7 @@
     updateClock();
     renderAberto();
     renderPendentes();
+    renderRevisao();
     setTipo('retrabalho');
     switchView(isAdmin ? 'novo' : 'aberto');
 
@@ -2365,8 +2503,8 @@
 
     // Sincronização em tempo real: quando outra pessoa cadastra, edita ou
     // conclui um item, a tela de todo mundo é atualizada sozinha.
-    watchRemoteChanges(K_REGISTROS, items => { state.registros = items; renderCounts(); safeRerenderAberto(); safeRerenderPend(); safeRerenderConc(); });
-    watchRemoteChanges(K_NC_REGISTROS, items => { state.ncRegistros = items; renderCounts(); safeRerenderAberto(); safeRerenderPend(); safeRerenderConc(); });
+    watchRemoteChanges(K_REGISTROS, items => { state.registros = items; renderCounts(); safeRerenderAberto(); safeRerenderPend(); safeRerenderRevisao(); safeRerenderConc(); });
+    watchRemoteChanges(K_NC_REGISTROS, items => { state.ncRegistros = items; renderCounts(); safeRerenderAberto(); safeRerenderPend(); safeRerenderRevisao(); safeRerenderConc(); });
     watchRemoteChanges(K_ITENS, items => {
       state.itens = items; renderDatalist();
       if(document.getElementById('view-cadastro').classList.contains('active')) renderItemCatalog();
@@ -2378,14 +2516,12 @@
 
     watchSaldoDiario();
 
-    // Recalcula a contagem de dias periodicamente e ao voltar o foco na aba,
-    // garantindo que "dias em aberto" reflita sempre a data atual. Também
-    // verifica se são 16:58 para capturar o saldo diário automaticamente.
+    // Recalcula "dias em aberto" só ao trocar de aba/tela ou ao voltar o foco no
+    // navegador (não a cada 60s enquanto a pessoa está na mesma tela) — assim a
+    // contagem sempre chega atualizada, sem interromper quem está rolando a lista.
+    // O relógio e a captura automática do saldo diário continuam de minuto em minuto.
     setInterval(() => {
       updateClock();
-      const activeView = document.querySelector('.view.active').id;
-      if(activeView === 'view-aberto') renderAberto();
-      if(activeView === 'view-pendentes') renderPendentes();
       document.getElementById('storageBanner').classList.toggle('show', !firestoreOk);
       tentarCapturarSaldoAutomatico();
     }, 60000);
@@ -2395,6 +2531,7 @@
         const activeView = document.querySelector('.view.active').id;
         if(activeView === 'view-aberto') renderAberto();
         if(activeView === 'view-pendentes') renderPendentes();
+        if(activeView === 'view-revisao') renderRevisao();
         tentarCapturarSaldoAutomatico();
       }
     });
