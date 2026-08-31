@@ -555,6 +555,55 @@
   function keyOf(s){ return normalize(s).replace(/[^a-z0-9]/g,''); }
   function fmtInt(n){ return (n==null || isNaN(n)) ? '—' : Math.round(n).toLocaleString('pt-BR'); }
   function fmtPct(n){ return (n==null || isNaN(n)) ? '—' : n.toFixed(1).replace('.', ',') + '%'; }
+
+  // ---------------- Plano de Ação por categoria de motivo ----------------
+  // O código do motivo (Q1, Q15...) pode variar entre relatórios, então a
+  // classificação é feita pelo TEXTO do motivo (palavras-chave), que costuma
+  // manter os mesmos termos mesmo quando o código muda.
+  const PLANO_ACAO_CATEGORIAS = [
+    { chave: /DANIFICAD|QUEBRAD|RACHAD|RASG|TRINCA|AMASSA|AVARIA/i,
+      corretiva: 'Segregar o lote afetado e inspecionar 100% dos itens produzidos no mesmo turno/máquina antes da liberação.',
+      preventiva: 'Revisar o manuseio, acondicionamento e transporte interno do item (embalagem, empilhamento, pontos de transferência entre setores) para eliminar o ponto de impacto identificado.',
+      responsavel: 'Produção / Logística Interna' },
+    { chave: /CONTAMINAD|PINTA|MANCHA|SUJ|OXID|RISC/i,
+      corretiva: 'Isolar o lote e verificar a origem da contaminação (ambiente, matéria-prima, ferramental ou operador) antes de liberar nova produção.',
+      preventiva: 'Reforçar a limpeza do posto/ferramental e revisar as condições de armazenamento do item, evitando exposição a agentes contaminantes.',
+      responsavel: 'Produção / Manutenção' },
+    { chave: /INCOMPLET|FALTANDO|AUSENTE|MONTAGEM/i,
+      corretiva: 'Conferir 100% do lote em aberto quanto à presença de todos os componentes antes da expedição.',
+      preventiva: 'Reforçar o checklist de montagem por etapa, com conferência visual obrigatória antes de encaminhar o item à próxima operação.',
+      responsavel: 'Produção / Montagem' },
+    { chave: /QUANTIDADE|SOBROU|FALTOU|DIVERG/i,
+      corretiva: 'Reconferir fisicamente o saldo do item no depósito envolvido e corrigir o registro de estoque, se necessário.',
+      preventiva: 'Padronizar a dupla conferência de quantidade na expedição/recebimento, com registro de quem conferiu.',
+      responsavel: 'Almoxarifado / Expedição' },
+    { chave: /MEDIDA|DIMENSIONAL|TOLER[AÂ]NCIA|FORA DE/i,
+      corretiva: 'Verificar a calibração do equipamento/ferramental usado no lote e bloquear novas produções até confirmação.',
+      preventiva: 'Incluir o item no plano de calibração periódica e reforçar a inspeção dimensional por amostragem durante o processo.',
+      responsavel: 'Qualidade / Engenharia' },
+    { chave: /FUNCIONA|QUEIMAD|CURTO|EL[EÉ]TRIC|LIGA/i,
+      corretiva: 'Realizar teste funcional em 100% do lote em aberto antes da liberação.',
+      preventiva: 'Revisar o teste de qualidade de saída (burn-in/teste elétrico) para capturar essa falha antes da expedição.',
+      responsavel: 'Qualidade / Engenharia Elétrica' },
+    { chave: /ETIQUETA|IDENTIFICA|R[OÓ]TUL|C[OÓ]DIGO ERRADO/i,
+      corretiva: 'Conferir a identificação de todo o lote em aberto e corrigir etiquetas divergentes.',
+      preventiva: 'Revisar o processo de emissão/aplicação de etiquetas, incluindo conferência cruzada com a ordem de produção.',
+      responsavel: 'Produção / PCP' },
+  ];
+  const PLANO_ACAO_PADRAO = {
+    corretiva: 'Investigar as ocorrências recentes deste motivo junto ao setor responsável e identificar a causa raiz predominante.',
+    preventiva: 'Revisar o procedimento operacional relacionado e reforçar o treinamento das equipes envolvidas.',
+    responsavel: 'Qualidade / Produção'
+  };
+  function planoAcaoPorMotivo(motivoTexto){
+    const texto = String(motivoTexto || '').toUpperCase();
+    return PLANO_ACAO_CATEGORIAS.find(c => c.chave.test(texto)) || PLANO_ACAO_PADRAO;
+  }
+  function prioridadePorPct(pct){
+    if(pct >= 15) return { prio:'Alta', prazo:'15 dias' };
+    if(pct >= 5) return { prio:'Média', prazo:'30 dias' };
+    return { prio:'Baixa', prazo:'45 dias' };
+  }
   function fmtNum(n){ return (n==null || isNaN(n)) ? '—' : Number(n).toLocaleString('pt-BR', {maximumFractionDigits:1}); }
   function esc(s){ return (s==null?'':s.toString()).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function nowStr(){
@@ -584,7 +633,9 @@
     const deposito = find(k => k.includes('deposito') || k.includes('almoxarifado') || k.includes('centrodecusto') || k.includes('centrocusto'));
     const ncNumero = find(k => k === 'id' || k.includes('numeronc') || k.includes('nnc') || (k.includes('numero') && k.includes('nc')));
     const observacao = find(k => k.includes('observacao'));
-    return { motivo, codigo, descricao, qtde, operador, cadastradoPor, status, data, deposito, origemProblema, ncNumero, observacao };
+    const causaDescricao = find(k => k.includes('descricaodacausa') || k.includes('descricaocausa') || (k.includes('causa') && !k.includes('origem')));
+    const acaoRegistrada = find(k => k.includes('acaopreventiva') || k.includes('acaocorretiva') || k.includes('acaopreventivacorretiva'));
+    return { motivo, codigo, descricao, qtde, operador, cadastradoPor, status, data, deposito, origemProblema, ncNumero, observacao, causaDescricao, acaoRegistrada };
   }
 
   // Ícone do troféu (PNG embutido em base64) usado no slide do pódio — evita depender
@@ -1200,6 +1251,20 @@
   }
 
   function truncateText(s, n){ return (s && s.length > n) ? s.slice(0, n-1) + '…' : (s || ''); }
+  // Pega até n textos distintos (ignorando maiúsc./espaços) de uma lista de registros
+  // livres, para não repetir a mesma frase duas vezes como se fossem evidências diferentes.
+  function amostrasUnicas(arr, n){
+    const vistos = new Set();
+    const out = [];
+    for(const item of (arr||[])){
+      const norm = (item||'').trim().toLowerCase();
+      if(!norm || vistos.has(norm)) continue;
+      vistos.add(norm);
+      out.push(truncateText(item.trim(), 70));
+      if(out.length >= n) break;
+    }
+    return out;
+  }
   function motivoShortCode(v){
     const m = (v==null?'':v.toString()).trim().match(/^([A-Za-z]+\s*\d+)/);
     return m ? m[1].replace(/\s+/g,'').toUpperCase() : truncateText(v, 12);
@@ -1308,7 +1373,9 @@
       amostraNota = ' (amostra de apenas 1 ocorrência — monitorar antes de agir de forma definitiva)';
     }
 
-    const evidencias = (it.observacoes||[]).slice(0,2).map(o => truncateText(o, 70));
+    const evidenciaCausas = amostrasUnicas(it.causas, 2);
+    const evidenciaObservacoes = amostrasUnicas(it.observacoes, 2);
+    const evidenciaAcoes = amostrasUnicas(it.acoesRegistradas, 2);
 
     // Prioridade: itens com apenas 1 ocorrência ainda não têm evidência suficiente para
     // ação definitiva (monitorar); itens com volume alto OU causa concentrada em uma única
@@ -1325,7 +1392,9 @@
     return {
       causa: causaBase.charAt(0).toUpperCase() + causaBase.slice(1) + amostraNota + '. ' + insightOrigem,
       acao: acao,
-      evidencias,
+      evidenciaCausas,
+      evidenciaObservacoes,
+      evidenciaAcoes,
       pri,
       priLabel
     };
@@ -1348,16 +1417,20 @@
       const origemCol = cols.origemProblema || cols.deposito;
       const origem = origemCol ? (r[origemCol]==null||r[origemCol]===''?'Não informado':r[origemCol].toString().trim()) : 'Não informado';
       const obs = cols.observacao ? (r[cols.observacao]==null?'':r[cols.observacao].toString().trim()) : '';
+      const causaTexto = cols.causaDescricao ? (r[cols.causaDescricao]==null?'':r[cols.causaDescricao].toString().trim()) : '';
+      const acaoTexto = cols.acaoRegistrada ? (r[cols.acaoRegistrada]==null?'':r[cols.acaoRegistrada].toString().trim()) : '';
       if(!bySetor.has(setor)) bySetor.set(setor, { total:0, items:new Map() });
       const s = bySetor.get(setor);
       s.total++;
-      if(!s.items.has(k)) s.items.set(k, { codigo:cod, descricao:desc, ocorrencias:0, unidades: cols.qtde?0:null, motivoCounts:new Map(), origens:new Map(), observacoes:[] });
+      if(!s.items.has(k)) s.items.set(k, { codigo:cod, descricao:desc, ocorrencias:0, unidades: cols.qtde?0:null, motivoCounts:new Map(), origens:new Map(), observacoes:[], causas:[], acoesRegistradas:[] });
       const it = s.items.get(k);
       it.ocorrencias++;
       if(cols.qtde) it.unidades += unidade;
       if(motivo) it.motivoCounts.set(motivo, (it.motivoCounts.get(motivo)||0)+1);
       it.origens.set(origem, (it.origens.get(origem)||0)+1);
       if(obs) it.observacoes.push(obs);
+      if(causaTexto) it.causas.push(causaTexto);
+      if(acaoTexto) it.acoesRegistradas.push(acaoTexto);
     });
     const result = [];
     SETOR_ORDER.forEach(setor => {
@@ -1374,6 +1447,8 @@
         delete it.motivoCounts;
         delete it.origens;
         delete it.observacoes;
+        delete it.causas;
+        delete it.acoesRegistradas;
       });
       result.push({ setor, total:s.total, items });
     });
@@ -1519,21 +1594,25 @@
 
     const evalHtml =
       '<h3 class="section-title" style="margin-top:36px;">Avaliação Automática — Ações de Melhoria</h3>' +
-      '<p class="section-desc">Causa provável e ação recomendada por item, com base na origem do problema (coluna "C.C Origem do Problema") e no motivo (Q.S.). Prioridade calculada por volume de ocorrências e concentração de origem. Gerado automaticamente a cada upload — recomenda-se validar com o time antes de agir, especialmente em itens com poucas ocorrências.</p>' +
+      '<p class="section-desc">Causa provável e ação recomendada por item, com base na origem do problema (coluna "C.C Origem do Problema") e no motivo (Q.S.). Quando existirem na planilha, "Causa" e "Observação" registradas pela equipe aparecem como apoio abaixo — são ponto de partida para investigação, não uma conclusão definitiva. Prioridade calculada por volume de ocorrências e concentração de origem. Gerado automaticamente a cada upload — recomenda-se validar com o time antes de agir, especialmente em itens com poucas ocorrências.</p>' +
       state.setorAgg.map(s => {
         if(!s.items.length) return '';
         return '<div style="margin:18px 0 8px; font-size:13px; font-weight:700; color:var(--ink);">' + esc(s.setor) + '</div>' +
           s.items.map(it => {
             const ev = it.avaliacao;
-            const evidenciasHtml = ev.evidencias.length
-              ? '<div style="margin-top:6px; font-size:12px; color:var(--ink-faint); font-style:italic;">Ex. de observação registrada: "' + ev.evidencias.map(e=>esc(e)).join('"; "') + '"</div>'
+            const linhaEvidencia = (rotulo, textos) => textos.length
+              ? '<div style="margin-top:5px; font-size:12px; color:var(--ink-faint);"><span style="font-style:normal;">' + rotulo + ':</span> <span style="font-style:italic;">"' + textos.map(e=>esc(e)).join('"; "') + '"</span></div>'
+              : '';
+            const evidenciasHtml = linhaEvidencia('Causa', ev.evidenciaCausas) + linhaEvidencia('Observação', ev.evidenciaObservacoes);
+            const evidenciasBloco = (ev.evidenciaCausas.length || ev.evidenciaObservacoes.length)
+              ? '<div style="margin-top:8px; padding-top:8px; border-top:1px dashed var(--line);"><div style="font-size:11px; color:var(--ink-faint); text-transform:uppercase; letter-spacing:.03em; margin-bottom:3px;">Registrado pela equipe (apoio, não substitui a análise acima)</div>' + evidenciasHtml + '</div>'
               : '';
             return '<div class="ac-card pri-' + ev.pri + '">' +
                 '<span class="ac-badge pri-' + ev.pri + '">' + esc(ev.priLabel) + '</span>' +
                 '<div class="ac-title">' + esc(it.codigo) + ' — ' + esc(truncateText(it.descricao||'—', 60)) + '</div>' +
                 '<div class="ac-line"><b>Causa provável:</b> ' + esc(ev.causa) + '</div>' +
                 '<div class="ac-line"><b>Ação recomendada:</b> ' + esc(ev.acao) + '</div>' +
-                evidenciasHtml +
+                evidenciasBloco +
               '</div>';
           }).join('');
       }).join('');
@@ -1968,17 +2047,18 @@
 
       // 6. Plano de Ação
       children.push(h1('6. Plano de Ação Recomendado'));
-      children.push(p('Ações corretivas e preventivas sugeridas para os principais motivos de não conformidade identificados.'));
-      agg.slice(0,5).forEach((m,i) => {
-        const prio = i < 2 ? 'Alta' : (i < 4 ? 'Média' : 'Baixa');
+      children.push(p('Ações corretivas e preventivas sugeridas para os principais motivos de não conformidade identificados, com o responsável e a prioridade definidos conforme a participação real de cada motivo no total de ocorrências.'));
+      agg.slice(0,5).forEach((m) => {
+        const { prio, prazo } = prioridadePorPct(m.pct);
         const prioColor = prio==='Alta'?RED_HEX:(prio==='Média'?'BF8F00':GREEN_HEX);
-        children.push(new Paragraph({ spacing:{before:200, after:80}, children:[ new TextRun({text: m.motivo + ' — ' + fmtInt(m.qtd) + ' ocorrências', bold:true, color:NAVY_HEX, size:21}) ] }));
-        children.push(bullet('Corretiva: investigar as ocorrências recentes deste motivo e identificar a causa raiz predominante.'));
-        children.push(bullet('Preventiva: revisar o procedimento operacional relacionado e reforçar o treinamento das equipes envolvidas.'));
+        const plano = planoAcaoPorMotivo(m.motivo);
+        children.push(new Paragraph({ spacing:{before:200, after:80}, children:[ new TextRun({text: m.motivo + ' — ' + fmtInt(m.qtd) + ' ocorrências (' + fmtPct(m.pct) + ' do total)', bold:true, color:NAVY_HEX, size:21}) ] }));
+        children.push(bullet('Corretiva: ' + plano.corretiva));
+        children.push(bullet('Preventiva: ' + plano.preventiva));
         children.push(new Paragraph({ spacing:{after:200}, children:[
-          new TextRun({text:'Responsável sugerido: ', bold:true, size:19}), new TextRun({text:'Qualidade / Produção', size:19}),
+          new TextRun({text:'Responsável sugerido: ', bold:true, size:19}), new TextRun({text:plano.responsavel, size:19}),
           new TextRun({text:'     |     Prioridade: ', bold:true, size:19}), new TextRun({text:prio, bold:true, color:prioColor, size:19}),
-          new TextRun({text:'     |     Prazo estimado: ', bold:true, size:19}), new TextRun({text: i<2?'15 dias':(i<4?'30 dias':'45 dias'), size:19}),
+          new TextRun({text:'     |     Prazo estimado: ', bold:true, size:19}), new TextRun({text: prazo, size:19}),
         ]}));
       });
       children.push(new Paragraph({ children:[new PageBreak()] }));
