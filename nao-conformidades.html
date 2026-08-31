@@ -502,11 +502,44 @@
   </main>
 </div>
 
-<footer class="app-footer">Painel gerado no navegador &middot; nenhum dado é enviado a servidores externos</footer>
+<footer class="app-footer">Histórico de relatórios compartilhado via Firebase · demais dados processados no navegador</footer>
 
 <input type="file" id="fileInput" accept=".xlsx">
 
-<script>
+<script type="module">
+  // ================= Firebase (histórico compartilhado entre usuários) =================
+  // Reaproveita o mesmo projeto Firebase do painel de Estoques 023/014, numa
+  // coleção separada, só para o histórico de relatórios de Não Conformidades.
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+  import {
+    getFirestore, doc, getDoc, setDoc, deleteDoc, onSnapshot, serverTimestamp,
+    enableIndexedDbPersistence, runTransaction
+  } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+  import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCYR4MPZi8J16RhsmrWRwNngcHZfROU1NY",
+    authDomain: "controle-de-depositos-599cd.firebaseapp.com",
+    projectId: "controle-de-depositos-599cd",
+    storageBucket: "controle-de-depositos-599cd.firebasestorage.app",
+    messagingSenderId: "902783447919",
+    appId: "1:902783447919:web:470275956bdcd5476c2e9a",
+    measurementId: "G-CTFRRHTVQ9"
+  };
+  const firebaseApp = initializeApp(firebaseConfig);
+  const db = getFirestore(firebaseApp);
+  const auth = getAuth(firebaseApp);
+  const FS_COLLECTION_NC = 'nc_historico_023_014';
+  enableIndexedDbPersistence(db).catch(() => { /* não suportado neste navegador — segue sem cache offline nativo */ });
+
+  // Login anônimo automático: garante que o Firestore aceite as requisições
+  // (sem pedir usuário/senha nesta página) e mantém o histórico compartilhado
+  // entre qualquer pessoa que abra a página.
+  let authReadyResolve;
+  const authReady = new Promise(res => { authReadyResolve = res; });
+  onAuthStateChanged(auth, user => { if(user) authReadyResolve(); });
+  signInAnonymously(auth).catch(err => console.error('Falha no login anônimo do Firebase:', err));
+
 (function(){
 
   // ---------------- Utilities ----------------
@@ -579,11 +612,10 @@
   };
 
   // ---------------- Persistent storage (Histórico de Relatórios) ----------------
-  // Uses window.storage when available (Claude artifact environment, persists across
-  // sessions automatically). When this file is downloaded and opened as a standalone
-  // page outside that environment, window.storage won't exist, so we fall back to a
-  // local IndexedDB database — this still persists across sessions in that same
-  // browser/machine, without needing a server.
+  // O Histórico de Relatórios (chaves "shared") é salvo no Firestore, então
+  // fica visível para qualquer pessoa que abra esta página, em qualquer
+  // dispositivo. Só a preferência pessoal "último usuário digitado" continua
+  // local (IndexedDB), por navegador/máquina.
   const IDB_NAME = 'nc_painel_db', IDB_STORE = 'kv';
   let idbPromise = null;
   function idbOpen(){
@@ -624,36 +656,43 @@
     });
   }
 
-  // Note: history-related keys (report index + report payloads) are stored with
-  // shared=true so the whole team sees the same "Histórico de Relatórios" — anyone
-  // using this page can view, load and delete any saved report. The last-used
-  // "usuário" name stays personal (shared=false) since that's just a per-device
-  // convenience default, not report data.
-  const usingArtifactStorage = () => (typeof window.storage !== 'undefined' && window.storage);
+  // Note: history-related keys (report index + report payloads) are stored
+  // shared=true, agora via Firestore, então todo mundo que abrir esta página
+  // vê o mesmo "Histórico de Relatórios" — qualquer usuário pode ver, carregar
+  // e excluir qualquer relatório salvo. O último "usuário" digitado continua
+  // pessoal (shared=false), pois é só uma conveniência de preenchimento do
+  // próprio navegador, não faz parte do relatório em si.
+  function fsDocRef(key){ return doc(db, FS_COLLECTION_NC, key); }
   const Store = {
     async get(key, shared){
       try{
-        if(usingArtifactStorage()){
-          const r = await window.storage.get(key, !!shared);
-          return r ? JSON.parse(r.value) : null;
+        if(shared){
+          await authReady;
+          const snap = await getDoc(fsDocRef(key));
+          return snap.exists() ? snap.data().value : null;
         }
         return await idbGet(key);
-      }catch(e){ return null; }
+      }catch(e){ console.error('Store.get failed', key, e); return null; }
     },
     async set(key, value, shared){
       try{
-        if(usingArtifactStorage()){
-          await window.storage.set(key, JSON.stringify(value), !!shared);
+        if(shared){
+          await authReady;
+          await setDoc(fsDocRef(key), { value, updatedAt: serverTimestamp() });
         } else {
           await idbSet(key, value);
         }
         return true;
-      }catch(e){ console.error('Store.set failed', e); return false; }
+      }catch(e){ console.error('Store.set failed', key, e); return false; }
     },
     async delete(key, shared){
       try{
-        if(usingArtifactStorage()){ await window.storage.delete(key, !!shared); }
-        else { await idbDelete(key); }
+        if(shared){
+          await authReady;
+          await deleteDoc(fsDocRef(key));
+        } else {
+          await idbDelete(key);
+        }
         return true;
       }catch(e){ return false; }
     }
@@ -1010,8 +1049,24 @@
     await Store.set(REPORT_INDEX_KEY, historyIndex, true);
   }
 
+  // Lê + altera + grava o índice do histórico dentro de uma transação do
+  // Firestore, para evitar que dois usuários salvando/excluindo relatórios ao
+  // mesmo tempo sobrescrevam a alteração um do outro.
+  async function mutateHistoryIndexTx(mutator){
+    await authReady;
+    const ref = fsDocRef(REPORT_INDEX_KEY);
+    let outcome;
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      const current = snap.exists() && Array.isArray(snap.data().value) ? snap.data().value.slice() : [];
+      const result = mutator(current);
+      outcome = result.returnValue;
+      tx.set(ref, { value: result.newIndex, updatedAt: serverTimestamp() });
+    });
+    return outcome;
+  }
+
   async function saveReportToHistory(usuario, observacoes){
-    await loadHistoryIndex();
     const meta = {
       fileName: state.fileName,
       periodStart: state.periodStart,
@@ -1022,29 +1077,32 @@
       itensDistintos: state.dashboard.itensDistintosNC,
     };
     const signature = reportSignature(meta);
-    const dup = historyIndex.find(r => r.signature === signature);
-    if(dup){
-      showToast('Este período já está salvo no histórico (' + dup.generatedAt + '). Nenhum registro duplicado foi criado.');
-      state.reportId = dup.id;
-      return dup.id;
+    const outcome = await mutateHistoryIndexTx(current => {
+      const dup = current.find(r => r.signature === signature);
+      if(dup) return { newIndex: current, returnValue: { duplicate: true, id: dup.id, generatedAt: dup.generatedAt } };
+      const id = genId();
+      const usuarioFinal = usuario || lastUsuario() || 'Não informado';
+      const entry = {
+        id, generatedAt: nowStr(), fileName: meta.fileName,
+        periodStart: meta.periodStart, periodEnd: meta.periodEnd,
+        totalNC: meta.totalNC, totalRegistros: meta.totalRegistros, totalUnidades: meta.totalUnidades,
+        itensDistintos: meta.itensDistintos, usuario: usuarioFinal, observacoes: observacoes || '',
+        signature
+      };
+      current.unshift(entry);
+      return { newIndex: current, returnValue: { duplicate: false, id, generatedAt: entry.generatedAt } };
+    });
+    if(outcome.duplicate){
+      showToast('Este período já está salvo no histórico (' + outcome.generatedAt + '). Nenhum registro duplicado foi criado.');
+      state.reportId = outcome.id;
+      return outcome.id;
     }
-    const id = genId();
-    const usuarioFinal = usuario || lastUsuario() || 'Não informado';
-    const entry = {
-      id, generatedAt: nowStr(), fileName: meta.fileName,
-      periodStart: meta.periodStart, periodEnd: meta.periodEnd,
-      totalNC: meta.totalNC, totalRegistros: meta.totalRegistros, totalUnidades: meta.totalUnidades,
-      itensDistintos: meta.itensDistintos, usuario: usuarioFinal, observacoes: observacoes || '',
-      signature
-    };
-    historyIndex.unshift(entry);
-    await saveHistoryIndex();
-    await Store.set(REPORT_KEY(id), buildReportPayload(), true);
+    await Store.set(REPORT_KEY(outcome.id), buildReportPayload(), true);
     if(usuario) await Store.set('nc:last-usuario', usuario, false);
-    state.reportId = id;
-    showToast('Relatório salvo no histórico (' + entry.generatedAt + ').');
+    state.reportId = outcome.id;
+    showToast('Relatório salvo no histórico (' + outcome.generatedAt + ').');
     renderHistoryList();
-    return id;
+    return outcome.id;
   }
 
   let _lastUsuarioCache = null;
@@ -1099,9 +1157,7 @@
 
   async function deleteReportById(id){
     if(!confirm('Excluir este relatório do histórico? Esta ação não pode ser desfeita.')) return;
-    await loadHistoryIndex();
-    historyIndex = historyIndex.filter(r => r.id !== id);
-    await saveHistoryIndex();
+    await mutateHistoryIndexTx(current => ({ newIndex: current.filter(r => r.id !== id), returnValue: null }));
     await Store.delete(REPORT_KEY(id), true);
     compareSelection = compareSelection.filter(x => x !== id);
     renderHistoryList();
@@ -2277,13 +2333,16 @@
   }
 
   // ================= Boot =================
+  function watchHistoryIndex(){
+    onSnapshot(fsDocRef(REPORT_INDEX_KEY), snap => {
+      historyIndex = (snap.exists() && Array.isArray(snap.data().value)) ? snap.data().value : [];
+      if(historyIndex.length > 0) tabs.style.display = 'flex';
+      renderHistoryList();
+    }, err => console.error('Falha ao observar histórico compartilhado:', err));
+  }
   async function initApp(){
     await primeLastUsuario();
-    await loadHistoryIndex();
-    await renderHistoryList();
-    if(historyIndex.length > 0){
-      tabs.style.display = 'flex';
-    }
+    watchHistoryIndex();
   }
   initApp();
 
