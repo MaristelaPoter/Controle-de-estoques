@@ -1,0 +1,8 @@
+{
+  "name": "automacao-saldo-diario",
+  "private": true,
+  "description": "Captura automática do Saldo Diário do painel Estoques 023/014, via GitHub Actions.",
+  "dependencies": {
+    "firebase-admin": "^12.0.0"
+  }
+}
