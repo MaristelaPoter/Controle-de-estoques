@@ -1,4 +1,4 @@
-/ Captura automática do Saldo Diário — roda no GitHub Actions, sem precisar
+// Captura automática do Saldo Diário - roda no GitHub Actions, sem precisar
 // que ninguém esteja com o painel aberto no navegador (inclusive fins de semana).
 //
 // Replica exatamente a mesma lógica de cálculo usada no painel (index.html):
@@ -13,7 +13,7 @@ const K_REGISTROS = 'retrabalho_registros_v1';
 const K_NC_REGISTROS = 'nc023_registros_v1';
 
 function todayISOSaoPaulo() {
-  // Brasil não usa mais horário de verão desde 2019 — São Paulo é sempre UTC-3.
+  // Brasil não usa mais horário de verão desde 2019 - São Paulo é sempre UTC-3.
   const now = new Date();
   const spTime = new Date(now.getTime() - 3 * 60 * 60 * 1000);
   return spTime.toISOString().slice(0, 10);
@@ -50,7 +50,7 @@ async function main() {
   const ref = db.collection(SALDO_COLLECTION).doc(dateStr);
   const existing = await ref.get();
   if (existing.exists) {
-    console.log('Saldo de ' + dateStr + ' já estava capturado — nada a fazer.');
+    console.log('Saldo de ' + dateStr + ' já estava capturado - nada a fazer.');
     return;
   }
 
