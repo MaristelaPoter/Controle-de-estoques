@@ -1,0 +1,27 @@
+name: Captura Saldo Diário
+
+on:
+  schedule:
+    # 19:58 UTC = 16:58 em São Paulo (Brasil não tem mais horário de verão desde 2019)
+    - cron: '58 19 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  capturar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalar dependências
+        working-directory: automacao-saldo
+        run: npm install
+
+      - name: Rodar captura do saldo diário
+        working-directory: automacao-saldo
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: node capturar-saldo-diario.js
