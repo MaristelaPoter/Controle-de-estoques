@@ -532,13 +532,21 @@
   const FS_COLLECTION_NC = 'nc_historico_023_014';
   enableIndexedDbPersistence(db).catch(() => { /* não suportado neste navegador — segue sem cache offline nativo */ });
 
-  // Login anônimo automático: garante que o Firestore aceite as requisições
-  // (sem pedir usuário/senha nesta página) e mantém o histórico compartilhado
-  // entre qualquer pessoa que abra a página.
+  // Login anônimo automático — mas SÓ quando ninguém estiver logado ainda.
+  // Como as três páginas (Estoques, Análise, Não Conformidades) compartilham
+  // o mesmo projeto Firebase, quem já entrou com e-mail/senha no painel de
+  // Estoques chega aqui já autenticado, e essa sessão real é reaproveitada
+  // — nunca sobrescrita por um login anônimo.
   let authReadyResolve;
   const authReady = new Promise(res => { authReadyResolve = res; });
-  onAuthStateChanged(auth, user => { if(user) authReadyResolve(); });
-  signInAnonymously(auth).catch(err => console.error('Falha no login anônimo do Firebase:', err));
+  let authResolved = false;
+  onAuthStateChanged(auth, user => {
+    if(user){
+      if(!authResolved){ authResolved = true; authReadyResolve(); }
+    } else if(!authResolved){
+      signInAnonymously(auth).catch(err => console.error('Falha no login anônimo do Firebase:', err));
+    }
+  });
 
 (function(){
 
