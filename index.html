@@ -12,7 +12,7 @@
     --priority:#B8471E; --priority-soft:#F7E9E2;
     --good:#1F7A4D; --good-soft:#E7F2EC;
     --pending:#946B1F; --pending-soft:#F3ECDE;
-    --amarelo:#A47C00; --amarelo-soft:#FAF0D7;
+    --amarelo:#C79A00; --amarelo-soft:#FBF1D2;
     --radius-sm:7px; --radius-md:10px; --radius-lg:14px;
     --shadow-sm:0 1px 2px rgba(15,20,17,.05);
     --shadow-md:0 6px 20px rgba(15,20,17,.07), 0 1px 3px rgba(15,20,17,.05);
@@ -205,6 +205,7 @@
   .badge{display:inline-block; padding:3px 10px; border-radius:999px; font-size:10.5px; font-weight:700; letter-spacing:.02em;}
   .badge.dias-ok{background:var(--good-soft); color:var(--good);}
   .badge.dias-atencao{background:var(--pending-soft); color:var(--pending);}
+  .badge.dep023{background:var(--priority-soft); color:var(--priority);}
   .badge.dias-critico{background:var(--priority-soft); color:var(--priority);}
   .badge.concluido{background:var(--good-soft); color:var(--good);}
 
@@ -275,7 +276,7 @@
     flex:1; height:38px; padding:0 12px; font-size:13px; border:none; border-radius:calc(var(--radius-md) - 3px); background:transparent; color:var(--ink-muted); font-weight:600; transition:.15s ease;
   }
   .tipo-toggle button.active{ background:var(--surface); color:var(--brand-deep); box-shadow:var(--shadow-sm);}
-  .tipo-toggle button.active[data-tipo="nc"]{ color:var(--pending);}
+  .tipo-toggle button.active[data-tipo="nc"]{ color:var(--priority);}
   .tipo-toggle button:not(.active):hover{ color:var(--ink);}
 
   /* Modal genérico */
@@ -305,10 +306,10 @@
     padding:18px 20px 16px 22px; box-shadow:var(--shadow-sm); position:relative; overflow:hidden;
   }
   .destaque-card::before{ content:''; position:absolute; top:0; left:0; width:4px; height:100%; background:var(--amarelo);}
-  .destaque-card.dep-023::before{ background:var(--pending);}
+  .destaque-card.dep-023::before{ background:var(--priority);}
   .destaque-head{ display:flex; align-items:center; gap:10px; margin-bottom:14px;}
   .destaque-icon{ width:30px; height:30px; border-radius:50%; background:var(--amarelo-soft); color:var(--amarelo); display:flex; align-items:center; justify-content:center; flex:none;}
-  .destaque-card.dep-023 .destaque-icon{ background:var(--pending-soft); color:var(--pending);}
+  .destaque-card.dep-023 .destaque-icon{ background:var(--priority-soft); color:var(--priority);}
   .destaque-icon svg{ width:15px; height:15px;}
   .destaque-head h4{ margin:0; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-muted); font-weight:700;}
   .destaque-valor{ font-size:25px; font-weight:800; color:var(--ink); line-height:1.15; margin-bottom:10px; letter-spacing:-.01em;}
@@ -683,7 +684,7 @@
             <div class="chart-canvas-wrap"><canvas id="chartSaldo014"></canvas></div>
           </div>
           <div class="chart-card">
-            <div class="chart-card-head"><h4>Depósito 023</h4><span class="badge dias-atencao">Meta: R$ 350,00/dia</span></div>
+            <div class="chart-card-head"><h4>Depósito 023</h4><span class="badge dep023">Meta: R$ 350,00/dia</span></div>
             <div class="chart-canvas-wrap"><canvas id="chartSaldo023"></canvas></div>
           </div>
         </div>
@@ -1315,7 +1316,7 @@
     const rows = list.map(r => {
       const dias = daysBetween(r.dataInicio, todayISO());
       return '<tr>' +
-        '<td><span class="badge '+(r.kind==='nc'?'dias-atencao':'dias-ok')+'">'+esc(r.tipoLabel)+'</span></td><td style="font-family:var(--mono);">'+esc(r.deposito||'—')+'</td><td>'+esc(r.setor)+'</td><td style="font-family:var(--mono);">'+esc(r.codigo)+'</td>' +
+        '<td><span class="badge '+(r.kind==='nc'?'dep023':'dias-ok')+'">'+esc(r.tipoLabel)+'</span></td><td style="font-family:var(--mono);">'+esc(r.deposito||'—')+'</td><td>'+esc(r.setor)+'</td><td style="font-family:var(--mono);">'+esc(r.codigo)+'</td>' +
         '<td><div class="cell-clamp" data-label="Descrição do Item" title="'+esc(r.descricaoItem)+'">'+esc(r.descricaoItem)+'</div></td>' +
         '<td>'+(r.desc ? '<div class="cell-clamp" data-label="Descrição" title="'+esc(r.desc)+'">'+esc(r.desc)+'</div>' : '<span class="badge dias-atencao">Aguardando descrição</span>')+'</td>' +
         '<td class="num">'+(r.quantidade!=null?fmtInt(r.quantidade):'—')+qtyNoteHtml(r)+'</td>' +
@@ -1818,8 +1819,8 @@
       data: { labels, datasets: [
         {
           label: 'Custo Total', data: dados023,
-          borderColor: '#88471E', backgroundColor: 'rgba(136,71,30,0.08)',
-          fill: true, tension: 0.25, pointRadius: 3, pointBackgroundColor: '#88471E'
+          borderColor: '#B8471E', backgroundColor: 'rgba(184,71,30,0.08)',
+          fill: true, tension: 0.25, pointRadius: 3, pointBackgroundColor: '#B8471E'
         },
         {
           label: 'Meta ('+fmtBRL(META_DEPOSITO_023)+')', data: labels.map(() => META_DEPOSITO_023),
@@ -2046,7 +2047,7 @@
       const fotoCell = r.kind==='nc' && r.foto ? '<img class="foto-thumb" src="'+r.foto+'" data-foto="'+r.id+'" alt="Foto anexada">' : '<span class="cell-muted">—</span>';
       const tsAtualizacao = r.atualizacaoEm ? '<div class="atualizacao-ts" data-id="'+r.id+'" style="font-size:10px;color:var(--ink-faint);margin-top:3px;">Atualizado em '+esc(fmtDateTimeBR(r.atualizacaoEm))+'</div>' : '<div class="atualizacao-ts" data-id="'+r.id+'"></div>';
       return '<tr><td><input type="checkbox" class="row-check" data-id="'+r.id+'" data-kind="'+r.kind+'" '+(selectedAberto.has(r.kind+':'+r.id)?'checked':'')+'></td>' +
-        '<td><span class="badge '+(r.kind==='nc'?'dias-atencao':'dias-ok')+'">'+esc(r.tipoLabel)+'</span></td><td style="font-family:var(--mono);">'+esc(r.deposito||'—')+'</td><td>'+esc(r.setor)+'</td><td style="font-family:var(--mono);">'+esc(r.codigo)+'</td>' +
+        '<td><span class="badge '+(r.kind==='nc'?'dep023':'dias-ok')+'">'+esc(r.tipoLabel)+'</span></td><td style="font-family:var(--mono);">'+esc(r.deposito||'—')+'</td><td>'+esc(r.setor)+'</td><td style="font-family:var(--mono);">'+esc(r.codigo)+'</td>' +
         '<td><div class="cell-clamp" data-label="Descrição do Item" title="'+esc(r.descricaoItem)+'">'+esc(r.descricaoItem)+'</div></td>' +
         '<td>'+(r.desc ? '<div class="cell-clamp" data-label="Descrição" title="'+esc(r.desc)+'">'+esc(r.desc)+'</div>' : '<span class="badge dias-atencao" title="Importado da Situação de Estoque — clique em Editar para preencher">Aguardando descrição</span>')+'</td>' +
         '<td class="num">'+(r.quantidade!=null?fmtInt(r.quantidade):'—')+qtyNoteHtml(r)+'</td>' +
@@ -2133,7 +2134,7 @@
     const rows = list.map(r => {
       const dias = daysBetween(r.dataInicio, todayISO());
       return '<tr>' +
-        '<td><span class="badge '+(r.kind==='nc'?'dias-atencao':'dias-ok')+'">'+esc(r.tipoLabel)+'</span></td><td style="font-family:var(--mono);">'+esc(r.deposito||'—')+'</td><td>'+esc(r.setor)+'</td><td style="font-family:var(--mono);">'+esc(r.codigo)+'</td>' +
+        '<td><span class="badge '+(r.kind==='nc'?'dep023':'dias-ok')+'">'+esc(r.tipoLabel)+'</span></td><td style="font-family:var(--mono);">'+esc(r.deposito||'—')+'</td><td>'+esc(r.setor)+'</td><td style="font-family:var(--mono);">'+esc(r.codigo)+'</td>' +
         '<td><div class="cell-clamp" data-label="Descrição do Item" title="'+esc(r.descricaoItem)+'">'+esc(r.descricaoItem)+'</div></td>' +
         '<td class="num">'+(r.quantidade!=null?fmtInt(r.quantidade):'—')+qtyNoteHtml(r)+'</td>' +
         '<td class="num">'+fmtBRL(r.valorUnitario!=null && r.quantidade!=null ? r.valorUnitario*r.quantidade : null)+'</td>' +
@@ -2193,7 +2194,7 @@
       const dias = daysBetween(r.dataInicio, todayISO());
       const fotoCell = r.kind==='nc' && r.foto ? '<img class="foto-thumb" src="'+r.foto+'" data-foto="'+r.id+'" alt="Foto anexada">' : '<span class="cell-muted">—</span>';
       const tsAtualizacao = r.atualizacaoEm ? '<div class="atualizacao-ts" data-id="'+r.id+'" style="font-size:10px;color:var(--ink-faint);margin-top:3px;">Atualizado em '+esc(fmtDateTimeBR(r.atualizacaoEm))+'</div>' : '<div class="atualizacao-ts" data-id="'+r.id+'"></div>';
-      return '<tr><td><span class="badge '+(r.kind==='nc'?'dias-atencao':'dias-ok')+'">'+esc(r.tipoLabel)+'</span></td><td style="font-family:var(--mono);">'+esc(r.deposito||'—')+'</td><td>'+esc(r.setor)+'</td><td style="font-family:var(--mono);">'+esc(r.codigo)+'</td>' +
+      return '<tr><td><span class="badge '+(r.kind==='nc'?'dep023':'dias-ok')+'">'+esc(r.tipoLabel)+'</span></td><td style="font-family:var(--mono);">'+esc(r.deposito||'—')+'</td><td>'+esc(r.setor)+'</td><td style="font-family:var(--mono);">'+esc(r.codigo)+'</td>' +
         '<td><div class="cell-clamp" data-label="Descrição do Item" title="'+esc(r.descricaoItem)+'">'+esc(r.descricaoItem)+'</div></td>' +
         '<td><div class="cell-clamp" data-label="Descrição" title="'+esc(r.desc)+'">'+esc(r.desc)+'</div></td>' +
         '<td class="num">'+(r.quantidade!=null?fmtInt(r.quantidade):'—')+qtyNoteHtml(r)+'</td>' +
@@ -2321,7 +2322,7 @@
     const rows = list.map(r => {
       const dias = daysBetween(r.dataInicio, r.dataConclusao);
       const fotoCell = r.kind==='nc' && r.foto ? '<img class="foto-thumb" src="'+r.foto+'" data-foto="'+r.id+'" alt="Foto anexada">' : '<span class="cell-muted">—</span>';
-      return '<tr><td><span class="badge '+(r.kind==='nc'?'dias-atencao':'dias-ok')+'">'+esc(r.tipoLabel)+'</span></td><td style="font-family:var(--mono);">'+esc(r.deposito||'—')+'</td><td>'+esc(r.setor)+'</td><td style="font-family:var(--mono);">'+esc(r.codigo)+'</td>' +
+      return '<tr><td><span class="badge '+(r.kind==='nc'?'dep023':'dias-ok')+'">'+esc(r.tipoLabel)+'</span></td><td style="font-family:var(--mono);">'+esc(r.deposito||'—')+'</td><td>'+esc(r.setor)+'</td><td style="font-family:var(--mono);">'+esc(r.codigo)+'</td>' +
         '<td><div class="cell-clamp" data-label="Descrição do Item" title="'+esc(r.descricaoItem)+'">'+esc(r.descricaoItem)+'</div></td>' +
         '<td><div class="cell-clamp" data-label="Descrição" title="'+esc(r.desc)+'">'+esc(r.desc)+'</div></td>' +
         '<td class="num">'+(r.quantidade!=null?fmtInt(r.quantidade):'—')+'</td>' +
