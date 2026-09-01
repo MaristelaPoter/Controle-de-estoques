@@ -296,6 +296,15 @@
   .breakdown-grid{ display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:16px; margin-bottom:24px;}
   @media(max-width:1300px){ .breakdown-grid{ grid-template-columns:1fr 1fr;} }
   @media(max-width:560px){ .breakdown-grid{ grid-template-columns:1fr;} }
+
+  .destaque-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:24px;}
+  @media(max-width:900px){ .destaque-grid{ grid-template-columns:1fr;} }
+  .destaque-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md); padding:16px 18px;}
+  .destaque-card h4{ margin:0 0 10px; font-size:11.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-muted); font-weight:700;}
+  .destaque-card .destaque-valor{ font-size:22px; font-weight:800; color:var(--ink); line-height:1.2;}
+  .destaque-card .destaque-item{ font-size:13px; font-weight:600; color:var(--ink); margin:4px 0 10px;}
+  .destaque-card .destaque-obs{ font-size:12.5px; color:var(--ink-muted); line-height:1.45; padding-top:10px; border-top:1px dashed var(--line);}
+  .destaque-card .destaque-obs b{ color:var(--ink);}
   .breakdown-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md); padding:16px 18px;}
   .breakdown-card h4{ margin:0 0 12px; font-size:12px; text-transform:uppercase; letter-spacing:.4px; color:var(--ink-muted);}
   .bar-row{ display:flex; align-items:center; gap:10px; margin-bottom:8px; font-size:12px;}
@@ -598,6 +607,7 @@
         </div>
         <div id="ledgerAberto"><div class="ledger"><div class="ledger-item"><div class="label">Em Aberto</div><div class="value">47</div><div class="sub">67.911 unidades no total · <span class="trend up">↑ 42 vs. 7 dias anteriores</span></div></div><div class="ledger-item "><div class="label">Dias Médios</div><div class="value">4</div></div><div class="ledger-item accent"><div class="label">Itens Mais Antigos</div><div class="value">1</div><div class="sub">com 36 dias em aberto</div></div><div class="ledger-item accent"><div class="label">Críticos (≥10 dias)</div><div class="value">3</div></div><div class="ledger-item"><div class="label">Custo Total em Aberto</div><div class="value" style="font-size:20px;">R$&nbsp;214.857,47</div><div class="sub">47 de 47 registro(s) com valor informado</div></div></div></div>
         <div class="breakdown-grid" id="breakdownAberto"><div class="breakdown-card"><h4>Em aberto por setor</h4><div class="bar-row"><span class="bar-label" title="Unidade 1">Unidade 1</span><span class="bar-track"><span class="bar-fill" style="width:100%"></span></span><span class="bar-val">20</span></div><div class="bar-row"><span class="bar-label" title="Em avaliação">Em avaliação</span><span class="bar-track"><span class="bar-fill" style="width:75%"></span></span><span class="bar-val">15</span></div><div class="bar-row"><span class="bar-label" title="Apoio 3">Apoio 3</span><span class="bar-track"><span class="bar-fill" style="width:25%"></span></span><span class="bar-val">5</span></div><div class="bar-row"><span class="bar-label" title="Apoio B203">Apoio B203</span><span class="bar-track"><span class="bar-fill" style="width:20%"></span></span><span class="bar-val">4</span></div><div class="bar-row"><span class="bar-label" title="Engenharia">Engenharia</span><span class="bar-track"><span class="bar-fill" style="width:5%"></span></span><span class="bar-val">1</span></div><div class="bar-row"><span class="bar-label" title="Extrusora">Extrusora</span><span class="bar-track"><span class="bar-fill" style="width:5%"></span></span><span class="bar-val">1</span></div><div class="bar-row"><span class="bar-label" title="Potência">Potência</span><span class="bar-track"><span class="bar-fill" style="width:5%"></span></span><span class="bar-val">1</span></div></div><div class="breakdown-card"><h4>Em aberto por depósito</h4><div class="bar-row"><span class="bar-label">Depósito 014</span><span class="bar-track"><span class="bar-fill" style="width:100%"></span></span><span class="bar-val">41</span></div><div class="bar-row"><span class="bar-label">Depósito 023</span><span class="bar-track"><span class="bar-fill" style="width:14.634146341463413%"></span></span><span class="bar-val">6</span></div></div><div class="breakdown-card"><h4>Custo por setor</h4><div class="bar-row"><span class="bar-label" title="Unidade 1">Unidade 1</span><span class="bar-track"><span class="bar-fill" style="width:100%"></span></span><span class="bar-val" style="width:auto; font-size:11px;">R$&nbsp;107.821,78</span></div><div class="bar-row"><span class="bar-label" title="Apoio 3">Apoio 3</span><span class="bar-track"><span class="bar-fill" style="width:35.384270228148715%"></span></span><span class="bar-val" style="width:auto; font-size:11px;">R$&nbsp;38.151,95</span></div><div class="bar-row"><span class="bar-label" title="Em avaliação">Em avaliação</span><span class="bar-track"><span class="bar-fill" style="width:27.243280532003826%"></span></span><span class="bar-val" style="width:auto; font-size:11px;">R$&nbsp;29.374,19</span></div><div class="bar-row"><span class="bar-label" title="Potência">Potência</span><span class="bar-track"><span class="bar-fill" style="width:18.714762453374444%"></span></span><span class="bar-val" style="width:auto; font-size:11px;">R$&nbsp;20.178,59</span></div><div class="bar-row"><span class="bar-label" title="Engenharia">Engenharia</span><span class="bar-track"><span class="bar-fill" style="width:11.311480852940841%"></span></span><span class="bar-val" style="width:auto; font-size:11px;">R$&nbsp;12.196,24</span></div><div class="bar-row"><span class="bar-label" title="Extrusora">Extrusora</span><span class="bar-track"><span class="bar-fill" style="width:3.729320736496837%"></span></span><span class="bar-val" style="width:auto; font-size:11px;">R$&nbsp;4.021,02</span></div><div class="bar-row"><span class="bar-label" title="Apoio B203">Apoio B203</span><span class="bar-track"><span class="bar-fill" style="width:2.887820994978936%"></span></span><span class="bar-val" style="width:auto; font-size:11px;">R$&nbsp;3.113,70</span></div></div><div class="breakdown-card"><h4>Custo por depósito</h4><div class="bar-row"><span class="bar-label">Depósito 014</span><span class="bar-track"><span class="bar-fill" style="width:100%"></span></span><span class="bar-val" style="width:auto; font-size:11px;">R$&nbsp;201.912,73</span></div><div class="bar-row"><span class="bar-label">Depósito 023</span><span class="bar-track"><span class="bar-fill" style="width:6.411056895719251%"></span></span><span class="bar-val" style="width:auto; font-size:11px;">R$&nbsp;12.944,74</span></div></div></div>
+        <div class="destaque-grid" id="destaqueValorArea"></div>
         <h3 class="section-title">Retrabalhos em Aberto <span class="n" id="nAberto">47</span></h3>
         <p class="section-desc">Contagem de dias atualizada automaticamente com base na data de início e na data de hoje.</p>
         <div class="form-card" id="compareCard" style="margin-bottom:20px;">
@@ -1923,6 +1933,28 @@
       '<div class="breakdown-card"><h4>Custo por setor</h4>'+(barsCusto||'<p class="section-desc">Nenhum registro com valor informado.</p>')+'</div>' +
       '<div class="breakdown-card"><h4>Custo por depósito</h4>'+(barsCustoDep||'<p class="section-desc">Nenhum registro com valor informado.</p>')+'</div>';
   }
+  function renderDestaqueValor(list){
+    const area = document.getElementById('destaqueValorArea');
+    if(!area) return;
+    const html = ['014','023'].map(dep => {
+      const itens = list.filter(r => r.deposito === dep && r.valorUnitario != null && r.quantidade != null);
+      if(!itens.length){
+        return '<div class="destaque-card"><h4>Maior Valor em Aberto — Depósito '+dep+'</h4><p class="section-desc" style="margin:0;">Nenhum registro com valor informado neste depósito.</p></div>';
+      }
+      let top = itens[0], topValor = itens[0].valorUnitario*itens[0].quantidade;
+      itens.forEach(r => {
+        const v = r.valorUnitario*r.quantidade;
+        if(v > topValor){ top = r; topValor = v; }
+      });
+      return '<div class="destaque-card">' +
+        '<h4>Maior Valor em Aberto — Depósito '+dep+'</h4>' +
+        '<div class="destaque-valor">'+fmtBRL(topValor)+'</div>' +
+        '<div class="destaque-item">'+esc(top.codigo)+' — '+esc(top.descricaoItem||'—')+'</div>' +
+        '<div class="destaque-obs"><b>Observação do problema:</b> '+esc(top.desc || 'Sem descrição registrada.')+'</div>' +
+      '</div>';
+    }).join('');
+    area.innerHTML = html;
+  }
   function renderTrend(abertos){
     const last7 = abertos.filter(r => { const d = daysBetween(r.dataInicio, todayISO()); return d != null && d <= 7; }).length;
     const prev7 = abertos.filter(r => { const d = daysBetween(r.dataInicio, todayISO()); return d != null && d > 7 && d <= 14; }).length;
@@ -1953,6 +1985,7 @@
       '<div class="ledger-item"><div class="label">Custo Total em Aberto</div><div class="value" style="font-size:20px;">'+fmtBRL(custoTotal)+'</div><div class="sub">'+comValor.length+' de '+abertos.length+' registro(s) com valor informado</div></div>' +
     '</div>';
     renderBreakdown(abertos, 'breakdownAberto');
+    renderDestaqueValor(abertos);
 
     document.getElementById('abertoKw').value = abertoFilters.kw;
     document.getElementById('abertoDescKw').value = abertoFilters.descKw;
