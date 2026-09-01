@@ -12,6 +12,7 @@
     --priority:#B8471E; --priority-soft:#F7E9E2;
     --good:#1F7A4D; --good-soft:#E7F2EC;
     --pending:#946B1F; --pending-soft:#F3ECDE;
+    --amarelo:#A47C00; --amarelo-soft:#FAF0D7;
     --radius-sm:7px; --radius-md:10px; --radius-lg:14px;
     --shadow-sm:0 1px 2px rgba(15,20,17,.05);
     --shadow-md:0 6px 20px rgba(15,20,17,.07), 0 1px 3px rgba(15,20,17,.05);
@@ -299,12 +300,26 @@
 
   .destaque-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:24px;}
   @media(max-width:900px){ .destaque-grid{ grid-template-columns:1fr;} }
-  .destaque-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md); padding:16px 18px;}
-  .destaque-card h4{ margin:0 0 10px; font-size:11.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-muted); font-weight:700;}
-  .destaque-card .destaque-valor{ font-size:22px; font-weight:800; color:var(--ink); line-height:1.2;}
-  .destaque-card .destaque-item{ font-size:13px; font-weight:600; color:var(--ink); margin:4px 0 10px;}
-  .destaque-card .destaque-obs{ font-size:12.5px; color:var(--ink-muted); line-height:1.45; padding-top:10px; border-top:1px dashed var(--line);}
-  .destaque-card .destaque-obs b{ color:var(--ink);}
+  .destaque-card{
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-lg);
+    padding:18px 20px 16px 22px; box-shadow:var(--shadow-sm); position:relative; overflow:hidden;
+  }
+  .destaque-card::before{ content:''; position:absolute; top:0; left:0; width:4px; height:100%; background:var(--amarelo);}
+  .destaque-card.dep-023::before{ background:var(--pending);}
+  .destaque-head{ display:flex; align-items:center; gap:10px; margin-bottom:14px;}
+  .destaque-icon{ width:30px; height:30px; border-radius:50%; background:var(--amarelo-soft); color:var(--amarelo); display:flex; align-items:center; justify-content:center; flex:none;}
+  .destaque-card.dep-023 .destaque-icon{ background:var(--pending-soft); color:var(--pending);}
+  .destaque-icon svg{ width:15px; height:15px;}
+  .destaque-head h4{ margin:0; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-muted); font-weight:700;}
+  .destaque-valor{ font-size:25px; font-weight:800; color:var(--ink); line-height:1.15; margin-bottom:10px; letter-spacing:-.01em;}
+  .destaque-item-row{ display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; margin-bottom:14px;}
+  .destaque-codigo{ font-family:var(--mono); font-size:11.5px; font-weight:700; color:var(--ink); background:var(--paper); border:1px solid var(--line-strong); padding:2px 8px; border-radius:6px; flex:none; white-space:nowrap;}
+  .destaque-desc{ font-size:13px; color:var(--ink); font-weight:500; line-height:1.35;}
+  .destaque-obs-box{ display:flex; gap:10px; background:var(--paper); border-radius:var(--radius-sm); padding:12px 14px;}
+  .destaque-obs-box svg{ width:15px; height:15px; color:var(--ink-faint); flex:none; margin-top:2px;}
+  .destaque-obs-box b{ display:block; font-size:10px; text-transform:uppercase; letter-spacing:.03em; color:var(--ink-faint); margin-bottom:3px; font-weight:700;}
+  .destaque-obs-box p{ margin:0; font-size:12.5px; color:var(--ink-muted); line-height:1.45;}
+  .destaque-empty{ font-size:12.5px; color:var(--ink-faint); margin:0;}
   .breakdown-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md); padding:16px 18px;}
   .breakdown-card h4{ margin:0 0 12px; font-size:12px; text-transform:uppercase; letter-spacing:.4px; color:var(--ink-muted);}
   .bar-row{ display:flex; align-items:center; gap:10px; margin-bottom:8px; font-size:12px;}
@@ -1936,21 +1951,26 @@
   function renderDestaqueValor(list){
     const area = document.getElementById('destaqueValorArea');
     if(!area) return;
+    const iconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>';
+    const quoteSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21c3 0 7-1.5 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.008V21"></path><path d="M15 21c3 0 7-1.5 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v4"></path></svg>';
     const html = ['014','023'].map(dep => {
       const itens = list.filter(r => r.deposito === dep && r.valorUnitario != null && r.quantidade != null);
       if(!itens.length){
-        return '<div class="destaque-card"><h4>Maior Valor em Aberto — Depósito '+dep+'</h4><p class="section-desc" style="margin:0;">Nenhum registro com valor informado neste depósito.</p></div>';
+        return '<div class="destaque-card dep-'+dep+'">' +
+          '<div class="destaque-head"><div class="destaque-icon">'+iconSvg+'</div><h4>Maior Valor em Aberto — Depósito '+dep+'</h4></div>' +
+          '<p class="destaque-empty">Nenhum registro com valor informado neste depósito.</p>' +
+        '</div>';
       }
       let top = itens[0], topValor = itens[0].valorUnitario*itens[0].quantidade;
       itens.forEach(r => {
         const v = r.valorUnitario*r.quantidade;
         if(v > topValor){ top = r; topValor = v; }
       });
-      return '<div class="destaque-card">' +
-        '<h4>Maior Valor em Aberto — Depósito '+dep+'</h4>' +
+      return '<div class="destaque-card dep-'+dep+'">' +
+        '<div class="destaque-head"><div class="destaque-icon">'+iconSvg+'</div><h4>Maior Valor em Aberto — Depósito '+dep+'</h4></div>' +
         '<div class="destaque-valor">'+fmtBRL(topValor)+'</div>' +
-        '<div class="destaque-item">'+esc(top.codigo)+' — '+esc(top.descricaoItem||'—')+'</div>' +
-        '<div class="destaque-obs"><b>Observação do problema:</b> '+esc(top.desc || 'Sem descrição registrada.')+'</div>' +
+        '<div class="destaque-item-row"><span class="destaque-codigo">'+esc(top.codigo)+'</span><span class="destaque-desc">'+esc(top.descricaoItem||'—')+'</span></div>' +
+        '<div class="destaque-obs-box">'+quoteSvg+'<div><b>Observação do problema</b><p>'+esc(top.desc || 'Sem descrição registrada.')+'</p></div></div>' +
       '</div>';
     }).join('');
     area.innerHTML = html;
