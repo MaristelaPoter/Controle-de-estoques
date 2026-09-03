@@ -1987,15 +1987,18 @@
     const rows = state.rawRows || [];
     const cols = state.cols || {};
     const total = rows.length;
-    function filterBySetor(colKey, nomeSetor){
-      if(!cols[colKey]) return [];
-      const target = keyOf(nomeSetor);
-      return rows.filter(r => keyOf(r[cols[colKey]]||'').includes(target));
+    function rowMatchesSetor(colKey, row, target){
+      return cols[colKey] ? keyOf(row[cols[colKey]]||'').includes(target) : false;
     }
     const interno = {}, externo = {};
     U1_SETORES.forEach(s => {
-      interno[s.cod] = filterBySetor('identificou', s.nome);
-      externo[s.cod] = filterBySetor('origemProblema', s.nome);
+      const target = keyOf(s.nome);
+      // Interno: quem identificou o problema foi este setor (não importa a origem).
+      interno[s.cod] = rows.filter(r => rowMatchesSetor('identificou', r, target));
+      // Externo: a origem do problema é este setor, MAS só conta se quem identificou foi
+      // OUTRO setor — quando identificou e origem são o mesmo setor, a NC já é 100% interna
+      // e não deve ser somada de novo aqui (evita contar a mesma NC duas vezes).
+      externo[s.cod] = rows.filter(r => rowMatchesSetor('origemProblema', r, target) && !rowMatchesSetor('identificou', r, target));
     });
     function topMotivosCombinados(bucket){
       const all = U1_SETORES.flatMap(s => bucket[s.cod]);
