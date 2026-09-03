@@ -1805,7 +1805,10 @@
       s1.addText('NÃO CONFORMIDADES DA SEMANA', { x:0.7, y:3.05, w:11.9, h:1.0, fontFace:TITLE_FONT, fontSize:34, color:LOGO_DARK, align:'center', valign:'middle', shrinkText:true });
       s1.addShape('rect', { x:4.67, y:4.15, w:4.0, h:0.055, fill:{color:LOGO_DARK}, line:{type:'none'} });
       s1.addText('TOP 5 MOTIVOS E TOP 5 ITENS COM MAIOR INCIDÊNCIA', { x:0.7, y:4.3, w:11.9, h:0.5, fontFace:TITLE_FONT, fontSize:15, color:NAVY, align:'center' });
-      s1.addText('Gerado em: ' + nowStr(), { x:0.7, y:4.9, w:11.9, h:0.4, fontFace:'Calibri', fontSize:12, italic:true, color:'595959', align:'center' });
+      const periodoCurto = (state.periodStart && state.periodEnd)
+        ? (state.periodStart.split('/').slice(0,2).join('/') + ' à ' + state.periodEnd.split('/').slice(0,2).join('/'))
+        : ('Gerado em: ' + nowStr());
+      s1.addText(periodoCurto, { x:0.7, y:4.9, w:11.9, h:0.4, fontFace:'Calibri', fontSize:12, italic:true, color:'595959', align:'center' });
 
       let s2 = pres.addSlide();
       tableSlideHeader(s2, 'Top 5 Motivos de Não Conformidade', 'Classificados do maior para o menor número de ocorrências — total de ' + fmtInt(state.dashboard.totalNC) + ' registros');
