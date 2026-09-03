@@ -1654,6 +1654,35 @@
     slide.addTable([header, ...body], { x:0.5, y, w:12.3, colW, border:{pt:1, color:'BCE0CB'}, autoPage:false, rowH:0.45, valign:'middle' });
   }
 
+  // ---------------- Gráfico de rosca para "Top Motivos" (usado no lugar da tabela) ----------------
+  // Mesmo estilo dos Slides Unidade 1: rosca com sigla nas fatias + legenda colorida ao lado.
+  const MOTIVOS_DONUT_RAMP = ['009135','FF9B02','118DFF','E8D166','929292','9BFF00','C79A3E'];
+  function motivosDonutLegend(slide, x, y, w, items, colors){
+    let ly = y;
+    items.forEach((it, i) => {
+      slide.addShape('ellipse', { x, y: ly+0.035, w:0.15, h:0.15, fill:{color:colors[i]}, line:{type:'none'} });
+      slide.addText([
+        { text:(it.cod||'—')+'  ', options:{ bold:true, color:colors[i], fontFace:'Calibri', fontSize:11 } },
+        { text:it.label, options:{ color:DARK, fontFace:'Calibri', fontSize:11 } },
+      ], { x:x+0.24, y:ly-0.08, w:w-0.24, h:0.4, valign:'middle', margin:0 });
+      ly += 0.42;
+    });
+  }
+  function motivosDonutSlide(pres, slide, aggSlice, total, y){
+    const dSize = 3.5;
+    const dx = 0.8, dy = y + 0.1;
+    const motivos = aggSlice.map(m => ({ cod: String(m.motivo||'').split(' - ')[0].trim(), motivo: m.motivo, qtd: m.qtd, pct: m.pct }));
+    const colors = MOTIVOS_DONUT_RAMP.slice(0, motivos.length);
+    slide.addChart(pres.ChartType.doughnut, [{ name:'Motivos', labels:motivos.map(f=>f.cod), values:motivos.map(f=>f.qtd) }], {
+      x:dx, y:dy, w:dSize, h:dSize, holeSize:55, chartColors:colors,
+      showTitle:false, showLegend:false, showLabel:true, showValue:false, showPercent:false,
+      dataLabelColor:DARK, dataLabelFontSize:12, dataLabelFontFace:'Calibri', dataLabelPosition:'outEnd', showLeaderLines:true,
+    });
+    motivosDonutLegend(slide, dx+dSize+0.55, dy+(dSize/2)-(motivos.length*0.42)/2+0.05, 7.2,
+      motivos.map((f,i) => ({ cod:f.cod, label:'- '+f.motivo.split(' - ').slice(1).join(' - ')+'  ('+fmtInt(f.qtd)+' · '+fmtPct(f.pct)+')' })),
+      colors);
+  }
+
   async function generatePresentation(){
     btnExport.disabled = true; const origLabel = btnExport.textContent; btnExport.textContent = 'Carregando biblioteca...';
     try{ await ensureLib('pptx'); }
@@ -1710,9 +1739,7 @@
       // Slide 4 — Top 5 motivos
       let s4 = pres.addSlide();
       tableSlideHeader(s4, 'Top 5 Motivos de Não Conformidade', 'Classificados do maior para o menor número de ocorrências');
-      styledTable(s4, ['Ranking','Motivo','Qtde.','% do Total'],
-        agg.slice(0,5).map((m,i)=>[i+1, m.motivo, fmtInt(m.qtd), fmtPct(m.pct)]),
-        [1.5, 7.9, 1.4, 1.5], 1.6, 13);
+      motivosDonutSlide(pres, s4, agg.slice(0,5), d.totalNC, 1.6);
 
       // Slide 5 — Top 5 itens
       let s5 = pres.addSlide();
@@ -1782,9 +1809,7 @@
 
       let s2 = pres.addSlide();
       tableSlideHeader(s2, 'Top 5 Motivos de Não Conformidade', 'Classificados do maior para o menor número de ocorrências — total de ' + fmtInt(state.dashboard.totalNC) + ' registros');
-      styledTable(s2, ['Ranking','Motivo da Não Conformidade','Qtde.','% do Total'],
-        agg.slice(0,5).map((m,i)=>[i+1, truncateText(m.motivo, 58), fmtInt(m.qtd), fmtPct(m.pct)]),
-        [1.6, 7.8, 1.4, 1.5], 1.6, 14);
+      motivosDonutSlide(pres, s2, agg.slice(0,5), state.dashboard.totalNC, 1.6);
 
       let s3 = pres.addSlide();
       tableSlideHeader(s3, 'Itens (SKU/Produtos) com Maior Incidência de Problemas', 'Top 5 itens por número de ocorrências, com total de unidades e motivo da não conformidade');
@@ -1816,9 +1841,7 @@
       // Slide 1 — Top 5 Motivos
       let s1 = pres.addSlide();
       tableSlideHeader(s1, 'Top 5 Motivos de Não Conformidade', 'Classificados do maior para o menor número de ocorrências — total de ' + fmtInt(state.dashboard.totalNC) + ' registros');
-      styledTable(s1, ['Ranking','Motivo da Não Conformidade','Qtde.','% do Total'],
-        agg.slice(0,5).map((m,i)=>[i+1, truncateText(m.motivo, 58), fmtInt(m.qtd), fmtPct(m.pct)]),
-        [1.6, 7.8, 1.4, 1.5], 1.6, 14);
+      motivosDonutSlide(pres, s1, agg.slice(0,5), state.dashboard.totalNC, 1.6);
 
       // Selos de prioridade (mesma paleta usada nos cards de ação da página)
       const PRI_STYLE = {
