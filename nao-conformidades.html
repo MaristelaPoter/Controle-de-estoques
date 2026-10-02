@@ -1869,134 +1869,6 @@
 
   btnExport.addEventListener('click', generatePresentation);
 
-  // ---------------- PPTX: Slides with tables only (Capa + Top 5 Motivos + Top 10 Itens) ----------------
-  async function generateTableSlides(){
-    btnSlidesTables.disabled = true; const orig = btnSlidesTables.textContent; btnSlidesTables.textContent = 'Carregando...';
-    try{ await ensureLib('pptx'); }
-    catch(err){ alert('Não foi possível carregar a biblioteca de geração de PowerPoint: ' + err.message); btnSlidesTables.disabled = false; btnSlidesTables.textContent = orig; return; }
-    btnSlidesTables.textContent = 'Gerando...';
-    try{
-      const pres = new PptxGenJS();
-      pres.layout = 'LAYOUT_WIDE';
-      const agg = state.motivoAgg;
-
-      let s1 = pres.addSlide();
-      s1.background = { color: WHITE };
-      s1.addImage({ data: LOGO_B64, x:5.4, y:0.55, w:2.5, h:2.27 });
-      s1.addText('NÃO CONFORMIDADES DA SEMANA', { x:0.7, y:3.05, w:11.9, h:1.0, fontFace:TITLE_FONT, fontSize:34, color:LOGO_DARK, align:'center', valign:'middle', shrinkText:true });
-      s1.addShape('rect', { x:4.67, y:4.15, w:4.0, h:0.055, fill:{color:LOGO_DARK}, line:{type:'none'} });
-      s1.addText('TOP 5 MOTIVOS E TOP 5 ITENS COM MAIOR INCIDÊNCIA', { x:0.7, y:4.3, w:11.9, h:0.5, fontFace:TITLE_FONT, fontSize:15, color:NAVY, align:'center' });
-      const periodoCurto = (state.periodStart && state.periodEnd)
-        ? (state.periodStart.split('/').slice(0,2).join('/') + ' à ' + state.periodEnd.split('/').slice(0,2).join('/'))
-        : ('Gerado em: ' + nowStr());
-      s1.addText(periodoCurto, { x:0.7, y:4.9, w:11.9, h:0.4, fontFace:'Calibri', fontSize:12, italic:true, color:'595959', align:'center' });
-
-      let s2 = pres.addSlide();
-      tableSlideHeader(s2, 'Top 5 Motivos de Não Conformidade', 'Classificados do maior para o menor número de ocorrências — total de ' + fmtInt(state.dashboard.totalNC) + ' registros');
-      motivosDonutSlide(pres, s2, agg.slice(0,5), state.dashboard.totalNC, 1.6);
-
-      let s3 = pres.addSlide();
-      tableSlideHeader(s3, 'Itens (SKU/Produtos) com Maior Incidência de Problemas', 'Top 5 itens por número de ocorrências, com total de unidades e motivo da não conformidade');
-      styledTable(s3, ['#','Código','Descrição','Ocorrências','Unidades','Motivo da Não Conformidade'],
-        state.itemAgg.slice(0,5).map((it,i)=>[i+1, it.codigo, truncateText(it.descricao||'—', 45), fmtInt(it.ocorrencias), it.unidades==null?'Não informado':fmtInt(it.unidades), truncateText(it.motivoPrincipal||'—', 32)]),
-        [0.4, 1.2, 4.8, 1.2, 1.1, 3.4], 1.6, 13);
-      addQLegend(s3, state.itemAgg.slice(0,5), it => it.motivoPrincipal, 1.6 + 6*0.45 + 0.18);
-
-      await pres.writeFile({ fileName: 'Slides_Nao_Conformidades.pptx' });
-    }catch(err){
-      alert('Erro ao gerar slides: ' + err.message);
-    }finally{
-      btnSlidesTables.disabled = false; btnSlidesTables.textContent = orig;
-    }
-  }
-  btnSlidesTables.addEventListener('click', generateTableSlides);
-
-  // ---------------- PPTX: Tabelas por Setor (Top 5 Motivos + Top 3 Itens por Setor) ----------------
-  async function generateSetorSlides(){
-    btnSlidesSetor.disabled = true; const orig = btnSlidesSetor.textContent; btnSlidesSetor.textContent = 'Carregando...';
-    try{ await ensureLib('pptx'); }
-    catch(err){ alert('Não foi possível carregar a biblioteca de geração de PowerPoint: ' + err.message); btnSlidesSetor.disabled = false; btnSlidesSetor.textContent = orig; return; }
-    btnSlidesSetor.textContent = 'Gerando...';
-    try{
-      if(!state.setorAgg){ alert('Não foi possível identificar a coluna "Cadastrado Por" no arquivo enviado, então não é possível gerar as tabelas por setor.'); return; }
-      const pres = new PptxGenJS();
-      pres.layout = 'LAYOUT_WIDE';
-      const agg = state.motivoAgg;
-
-      // Slide 1 — Top 5 Motivos
-      let s1 = pres.addSlide();
-      tableSlideHeader(s1, 'Top 5 Motivos de Não Conformidade', 'Classificados do maior para o menor número de ocorrências — total de ' + fmtInt(state.dashboard.totalNC) + ' registros');
-      motivosDonutSlide(pres, s1, agg.slice(0,5), state.dashboard.totalNC, 1.6);
-
-      // Um slide por setor — Top 3 itens (tabela)
-      // (exceto "Não mapeado", que fica só na página)
-      state.setorAgg.filter(s => s.setor !== 'Não mapeado').forEach(s => {
-        const slide = pres.addSlide();
-        tableSlideHeader(slide, 'NC - Setor: ' + s.setor, 'Top ' + s.items.length + ' itens com mais recorrência de problema — total de ' + fmtInt(s.total) + ' NCs no setor');
-        if(s.items.length){
-          styledTable(slide, ['#','Código','Descrição','Motivo NC','Ocorrências','Unidades','% do Setor'],
-            s.items.map((it,i)=>[i+1, it.codigo, truncateText(it.descricao||'—', 42), truncateText(it.motivoPrincipal||'—', 26), fmtInt(it.ocorrencias), it.unidades==null?'Não informado':fmtInt(it.unidades), fmtPct(it.pct)]),
-            [0.5, 1.3, 4.5, 2.6, 1.2, 1.1, 1.1], 1.6, 11);
-          addQLegend(slide, s.items, it => it.motivoPrincipal, 1.6 + (s.items.length+1)*0.45 + 0.18);
-        } else {
-          slide.addText('Nenhum registro neste setor.', { x:0.6, y:2, w:12, h:0.6, fontFace:'Calibri', fontSize:14, italic:true, color:'595959' });
-        }
-      });
-
-      // Slide final — Pódio (Top 3 setores com mais NCs, exceto "Não mapeado")
-      // Composição inspirada em pódio clássico (blocos com "tampa" em tom mais claro,
-      // troféu acima do 1º lugar, barra de base) — desenhada com formas próprias,
-      // nas cores do nosso sistema visual.
-      const podiumSectors = state.setorAgg.filter(s => s.setor !== 'Não mapeado').slice().sort((a,b)=> b.total - a.total).slice(0,3);
-      if(podiumSectors.length){
-        const sPodium = pres.addSlide();
-        sPodium.background = { color: NAVY };
-        sPodium.addText('PÓDIO — SETORES COM MAIS NÃO CONFORMIDADES', { x:0.6, y:0.4, w:12.1, h:0.65, fontFace:'Georgia', fontSize:26, bold:true, color:WHITE, align:'center' });
-        sPodium.addText('Ranking por volume de registros no período — quanto maior a posição, maior a atenção necessária', { x:0.6, y:1.05, w:12.1, h:0.4, fontFace:'Calibri', fontSize:13, italic:true, color:'CDEFDA', align:'center' });
-
-        const order = [1, 0, 2]; // ordem de exibição no pódio: 2º, 1º, 3º
-        const heights = [2.0, 2.8, 1.5];
-        const colors = ['946B1F', 'B8471E', '0F5C3A'];      // 2º âmbar, 1º terracota (mais urgente), 3º verde
-        const capColors = ['C79A3E', 'E08658', '4C9B72'];   // "tampa" em tom mais claro de cada bloco
-        const baseY = 6.0, blockW = 3.0, gap = 0.3, capH = 0.28;
-        const totalW = blockW*3 + gap*2;
-        const startX = (13.33 - totalW)/2;
-
-        order.forEach((rank, i) => {
-          const s = podiumSectors[rank];
-          if(!s) return;
-          const x = startX + i*(blockW+gap);
-          const h = heights[i];
-          const y = baseY - h;
-          // tampa (tom mais claro) + corpo do bloco
-          sPodium.addShape('rect', { x, y, w:blockW, h:capH, fill:{color:capColors[i]}, line:{color:WHITE, width:1} });
-          sPodium.addShape('rect', { x, y:y+capH, w:blockW, h:h-capH, fill:{color:colors[i]}, line:{color:WHITE, width:1} });
-          // número do lugar, sempre centralizado dentro da altura visível do bloco
-          sPodium.addText((rank+1) + 'º', { x, y:y+capH, w:blockW, h:h-capH, align:'center', valign:'middle', fontFace:'Georgia', fontSize:40, bold:true, color:WHITE });
-          // troféu acima do bloco do 1º lugar — ícone PNG embutido (dourado, com sombreado),
-          // evita depender de emoji (renderiza preto em algumas fontes) ou formas manuais.
-          if(rank === 0){
-            const trophyW = 0.95, trophyH = 0.95 * (740/738);
-            sPodium.addImage({ data:'image/png;base64,' + TROPHY_PNG_B64, x: x + blockW/2 - trophyW/2, y: y - trophyH - 0.08, w:trophyW, h:trophyH });
-          }
-          // nome do setor e contagem: faixa fixa abaixo de todos os blocos (não depende da altura do bloco)
-          sPodium.addText(s.setor, { x:x+0.05, y:baseY+0.28, w:blockW-0.1, h:0.32, align:'center', fontFace:'Calibri', fontSize:15, bold:true, color:WHITE });
-          sPodium.addText(fmtInt(s.total) + ' NCs', { x:x+0.05, y:baseY+0.62, w:blockW-0.1, h:0.32, align:'center', fontFace:'Consolas', fontSize:16, color:WHITE });
-        });
-
-        // barra de base (plataforma), como no pódio de referência
-        sPodium.addShape('roundRect', { x:startX-0.3, y:baseY, w:totalW+0.6, h:0.16, rectRadius:0.08, fill:{color:ACCENT}, line:{type:'none'} });
-      }
-
-      await pres.writeFile({ fileName: 'Tabelas_NC_Setor.pptx' });
-    }catch(err){
-      alert('Erro ao gerar slides por setor: ' + err.message);
-    }finally{
-      btnSlidesSetor.disabled = false; btnSlidesSetor.textContent = orig;
-    }
-  }
-  btnSlidesSetor.addEventListener('click', generateSetorSlides);
-
   // ---------------- PPTX: Slides Unidade 1 (Indicadores Internos x Externos — P1/PL/P3) ----------------
   // Recalcula tudo a partir do arquivo carregado no momento — não fica preso aos dados
   // do primeiro relatório aberto, então basta trocar o arquivo e gerar de novo.
@@ -2108,107 +1980,364 @@
     return tableH + (legendH ? legendH + 0.1 : 0);
   }
 
-  async function generateUnidade1Slides(){
-    btnSlidesU1.disabled = true; const orig = btnSlidesU1.textContent; btnSlidesU1.textContent = 'Carregando...';
-    try{ await ensureLib('pptx'); }
-    catch(err){ alert('Não foi possível carregar a biblioteca de geração de PowerPoint: ' + err.message); btnSlidesU1.disabled = false; btnSlidesU1.textContent = orig; return; }
-    btnSlidesU1.textContent = 'Gerando...';
-    try{
-      const cols = state.cols || {};
-      if(!cols.identificou){ alert('Não foi possível identificar a coluna "C.C. Identifiou" (Setor que Identificou o Problema) no arquivo enviado — os Slides Unidade 1 precisam dela para calcular o indicador interno.'); return; }
-      if(!cols.origemProblema){ alert('Não foi possível identificar a coluna "C.C Origem do Problema" no arquivo enviado — os Slides Unidade 1 precisam dela para calcular o indicador externo.'); return; }
-      const d = computeUnidade1Data();
-      const pct = n => (n / (d.total||1) * 100).toFixed(1).replace('.', ',') + '%';
 
+  // ======================================================================
+  // PADRÃO VISUAL DOS SLIDES — "ÍNDICE DE NÃO CONFORMIDADE — [ÁREA]"
+  // Camada exclusivamente de APRESENTAÇÃO. Os números continuam vindo das
+  // mesmas funções de sempre (computeItemAgg, computeMotivoAgg, setorDeCadastro,
+  // computeUnidade1Data) aplicadas ao mesmo DataGrid; aqui só se escolhe como
+  // desenhar. Modelo de referência: Apresentação_Extrusora_1.pdf.
+  // ======================================================================
+  const PD = {
+    VERDE:'2FAE55',            // títulos, subtítulos e totais do rodapé
+    ESCURO:'1B5E36',           // linhas, valores e ano
+    CINZA:'404040',            // texto da legenda
+    FONTE:'Arial',
+    // Cor fixa por posição no ranking (igual em todos os slides e em todas as áreas)
+    PALETA:['70AD47','5B9BD5','FFC000','385723','2F5597','BF9000','A9D18E','9DC3E6','FFD966'],
+    OUTROS:'548235',
+    VERDES:['70AD47','A9D18E','385723'],   // indicador interno
+    AZUIS:['5B9BD5','9DC3E6','2F5597'],    // indicador externo
+  };
+  const PD_MESES = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
+
+  // ---------- formatação ----------
+  function pdPeriodo(){
+    const a = state.periodStart, b = state.periodEnd;
+    if(!a || !b) return '';
+    const [da, ma, ya] = a.split('/'), [db, mb, yb] = b.split('/');
+    if(ya !== yb) return PD_MESES[ma-1] + '/' + ya + ' A ' + PD_MESES[mb-1] + '/' + yb;
+    if(ma !== mb) return PD_MESES[ma-1] + ' A ' + PD_MESES[mb-1] + '/' + ya;
+    return da + '/' + ma + ' A ' + db + '/' + mb + '/' + yb;
+  }
+  function pdAno(){
+    const e = state.periodEnd || state.periodStart;
+    const m = e && e.match(/(\d{4})$/);
+    return m ? m[1] : String(new Date().getFullYear());
+  }
+  function pdSub(texto){ const p = pdPeriodo(); return texto + (p ? ' (' + p + ')' : ''); }
+  function pdNum(n){ if(n==null || isNaN(n)) return '—'; return Number.isInteger(n) ? String(n) : Number(n).toLocaleString('pt-BR', {maximumFractionDigits:2}); }
+  function pdMoeda(n){ return 'R$ ' + Number(n||0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+  function pdPct(p){ if(p > 0 && p < 0.1) return '<0.1%'; return p.toFixed(1) + '%'; }
+  // Corta na última palavra inteira antes do limite (nunca no meio de uma palavra)
+  function pdTrunc(s, n){
+    s = String(s||'').trim();
+    if(s.length <= n) return s;
+    let t = s.slice(0, n);
+    const i = t.lastIndexOf(' ');
+    if(i > n*0.6) t = t.slice(0, i);
+    return t.replace(/[\s,;:(\-–—]+$/, '') + '…';
+  }
+  // Completa o texto do motivo com a descrição oficial (QS_LEGEND) — o campo Q.S. da planilha vem cortado
+  function pdMotivoRotulo(txt){
+    const t = String(txt||'').trim();
+    const cod = (t.split(' - ')[0] || '').trim().toUpperCase();
+    if(/^Q\d+$/.test(cod) && QS_LEGEND[cod]) return cod + ' - ' + QS_LEGEND[cod].toUpperCase();
+    return t.toUpperCase();
+  }
+
+  // ---------- modelos de dados (reaproveitam as agregações existentes) ----------
+  function pdParseNum(v){
+    if(v==null || v==='') return NaN;
+    if(typeof v === 'number') return v;
+    let s = String(v).replace(/R\$/gi,'').replace(/\s/g,'');
+    if(s.indexOf(',') >= 0) s = s.replace(/\./g,'').replace(',','.');
+    return parseFloat(s);
+  }
+  // Coluna opcional de valor unitário (o DataGrid atual não a possui)
+  function pdColValor(){
+    const hs = (state.rawRows && state.rawRows.length) ? Object.keys(state.rawRows[0]) : [];
+    return hs.find(h => { const k = keyOf(h); return k.includes('valorunit') || k.includes('vlrunit') || k.includes('vlunit') || k.includes('precounit') || k.includes('custounit'); }) || null;
+  }
+  function pdItens(rows){
+    const cols = state.cols, usaUn = !!cols.qtde, colV = pdColValor();
+    const agg = computeItemAgg(rows, cols);   // lógica existente, aplicada às linhas da área
+    const vmap = new Map();
+    if(colV){
+      rows.forEach(r => {
+        const cod = cols.codigo ? (r[cols.codigo]==null ? 'S/CÓDIGO' : r[cols.codigo].toString().trim()) : 'S/CÓDIGO';
+        const desc = cols.descricao ? (r[cols.descricao]==null ? '' : r[cols.descricao].toString().trim()) : '';
+        const q = usaUn ? (parseFloat(r[cols.qtde]) || 0) : 1;
+        const vu = pdParseNum(r[colV]);
+        const k = cod + '||' + desc;
+        vmap.set(k, (vmap.get(k)||0) + q * (isNaN(vu) ? 0 : vu));
+      });
+    }
+    const itens = agg.map(it => ({
+      codigo: it.codigo, descricao: it.descricao,
+      qtd: usaUn ? it.unidades : it.ocorrencias,
+      valor: colV ? (vmap.get(it.codigo + '||' + it.descricao) || 0) : null,
+    }));
+    return { itens, usaUn, temValor: !!colV };
+  }
+  // Motivos em UNIDADES (o padrão mostra "un / %"); mesma chave de agrupamento de computeMotivoAgg
+  function pdMotivos(rows){
+    const cols = state.cols, usaUn = !!cols.qtde, map = new Map();
+    rows.forEach(r => {
+      const v = (r[cols.motivo]==null ? 'Não informado' : r[cols.motivo].toString().trim()) || 'Não informado';
+      map.set(v, (map.get(v)||0) + (usaUn ? (parseFloat(r[cols.qtde]) || 0) : 1));
+    });
+    return Array.from(map, ([motivo, qtd]) => ({ motivo, qtd })).sort((a,b) => b.qtd - a.qtd);
+  }
+  // Somente os N maiores (sem agrupar o restante)
+  function pdTop(lista, campo, n){ return lista.filter(x => (x[campo]||0) > 0).sort((a,b) => b[campo] - a[campo]).slice(0, n); }
+  // Top N individuais + "OUTROS" (só agrupa quando passa de N+1 linhas)
+  function pdAgrupa(lista, campo, maxIndiv){
+    const ord = lista.filter(x => (x[campo]||0) > 0).sort((a,b) => b[campo] - a[campo]);
+    const total = ord.reduce((s,x) => s + x[campo], 0);
+    if(ord.length <= maxIndiv + 1) return { linhas: ord, total, restantes: 0 };
+    const resto = ord.slice(maxIndiv);
+    const linhas = ord.slice(0, maxIndiv);
+    linhas.push({ outros:true, n:resto.length, [campo]: resto.reduce((s,x) => s + x[campo], 0) });
+    return { linhas, total, restantes: resto.length };
+  }
+
+  // ---------- moldura do slide (cabeçalho + rodapé iguais em todos) ----------
+  function pdBase(pres, area, subtitulo, rodape){
+    const s = pres.addSlide();
+    s.background = { color:'FFFFFF' };
+    s.addImage({ data: LOGO_B64, x:0.2, y:0.28, w:1.1, h:1.0 });
+    s.addText('ÍNDICE DE NÃO CONFORMIDADE — ' + area, { x:1.4, y:0.3, w:11.6, h:0.9, fontFace:PD.FONTE, bold:true, fontSize:28, color:PD.VERDE, valign:'middle', margin:0, shrinkText:true, isTextBox:true });
+    s.addShape('rect', { x:0.35, y:1.25, w:12.63, h:0.05, fill:{color:PD.ESCURO}, line:{type:'none'} });
+    s.addText(subtitulo.toUpperCase(), { x:0.35, y:1.45, w:12.63, h:0.4, fontFace:PD.FONTE, bold:true, fontSize:13, color:PD.VERDE, valign:'middle', margin:0, isTextBox:true });
+    s.addShape('rect', { x:0.35, y:6.93, w:12.63, h:0.045, fill:{color:PD.ESCURO}, line:{type:'none'} });
+    s.addText(rodape, { x:0.35, y:7.02, w:10.4, h:0.38, fontFace:PD.FONTE, bold:true, fontSize:14, color:PD.VERDE, valign:'middle', margin:0, isTextBox:true });
+    s.addText(pdAno(), { x:11.2, y:6.98, w:1.78, h:0.45, fontFace:PD.FONTE, bold:true, fontSize:22, color:PD.ESCURO, align:'right', valign:'middle', margin:0, isTextBox:true });
+    return s;
+  }
+  // Rosca com total no centro. Rótulos só nas fatias ≥ 3% do total (evita números sobrepostos).
+  function pdRosca(pres, slide, cx, cy, size, valores, cores, total, textoCentro, fmt, fonteCentro){
+    const lim = total * 0.03;
+    slide.addChart(pres.ChartType.doughnut, [{ name:'Série', labels: valores.map((v,i) => String(i+1)), values: valores }], {
+      x: cx - size/2, y: cy - size/2, w:size, h:size, holeSize:50, chartColors:cores,
+      showTitle:false, showLegend:false, showLabel:false, showValue:true, showPercent:false,
+      dataLabelColor:'000000', dataLabelFontSize:9, dataLabelFontFace:'Calibri',
+      dataLabelFormatCode: '[>=' + lim + ']' + fmt + ';;;',
+      dataBorder:{ pt:1, color:'FFFFFF' },
+    });
+    slide.addText(textoCentro, { x: cx - 1.0, y: cy - 0.6, w:2.0, h:1.2, align:'center', valign:'middle', fontFace:PD.FONTE, bold:true, fontSize: fonteCentro || 26, color:PD.ESCURO, margin:0, isTextBox:true });
+  }
+  // Legenda em linha única: quadradinho + "CÓDIGO — DESCRIÇÃO" + valor à direita
+  function pdLegendaLinha(slide, linhas){
+    const n = linhas.length, passo = n > 1 ? Math.min(n <= 4 ? 0.9 : 0.489, 4.45/(n-1)) : 0.5;
+    const y0 = 4.3 - passo*(n-1)/2;
+    linhas.forEach((l, i) => {
+      const yc = y0 + i*passo;
+      slide.addShape('rect', { x:6.15, y:yc-0.08, w:0.16, h:0.16, fill:{color:l.cor}, line:{type:'none'} });
+      const runs = [{ text:l.negrito, options:{ bold:true, color:PD.CINZA } }];
+      if(l.resto) runs.push({ text:l.resto, options:{ bold:false, color:PD.CINZA } });
+      slide.addText(runs, { x:6.41, y:yc-0.17, w:5.3, h:0.34, fontFace:PD.FONTE, fontSize:10, valign:'middle', margin:0, isTextBox:true });
+      slide.addText(l.valor, { x:11.7, y:yc-0.17, w:1.28, h:0.34, fontFace:PD.FONTE, bold:true, fontSize:12.5, color:PD.ESCURO, align:'right', valign:'middle', margin:0, isTextBox:true });
+    });
+  }
+  // Legenda em duas linhas (usada no slide de motivos): rótulo + "N un / P%"
+  function pdLegendaDupla(slide, linhas){
+    const n = linhas.length, passo = Math.min(0.78, 4.5/n);
+    const y0 = 4.3 - passo*(n-1)/2;
+    linhas.forEach((l, i) => {
+      const yc = y0 + i*passo;
+      slide.addShape('rect', { x:7.6, y:yc-0.1, w:0.2, h:0.2, fill:{color:l.cor}, line:{type:'none'} });
+      slide.addText([
+        { text:l.rotulo, options:{ bold:true, color:PD.CINZA, fontSize:11, breakLine:true } },
+        { text:l.detalhe, options:{ bold:true, color:PD.ESCURO, fontSize:10 } },
+      ], { x:7.95, y:yc-passo/2+0.02, w:5.03, h:passo-0.04, fontFace:PD.FONTE, valign:'middle', margin:0, isTextBox:true });
+    });
+  }
+
+  // ---------- slides padrão de uma área: itens / motivos / valor ----------
+  function pdSlideItens(pres, area, rows){
+    const m = pdItens(rows), top = pdTop(m.itens, 'qtd', 3);
+    if(!top.length) return;
+    const somaTop = top.reduce((a,l) => a + l.qtd, 0), totalGeral = m.itens.reduce((a,l) => a + (l.qtd||0), 0);
+    const cores = top.map((l,i) => PD.PALETA[i]);
+    const rodape = 'TOTAL DE ITENS: ' + m.itens.length + '      ' + (m.usaUn ? 'TOTAL DE PEÇAS N.C.: ' : 'TOTAL DE N.C.: ') + pdNum(totalGeral) + (m.usaUn ? ' UN' : '');
+    const s = pdBase(pres, area, pdSub('Top 3 itens com mais não conformidades'), rodape);
+    pdRosca(pres, s, 3.15, 4.3, 4.4, top.map(l => l.qtd), cores, somaTop, 'TOP 3\n' + pdNum(somaTop) + ' ' + (m.usaUn ? 'UN' : 'NC'), '0', 20);
+    pdLegendaLinha(s, top.map((l,i) => ({
+      cor: cores[i], negrito: l.codigo, resto: ' — ' + pdTrunc(String(l.descricao||'').toUpperCase(), 44), valor: pdNum(l.qtd),
+    })));
+  }
+  function pdSlideMotivos(pres, area, rows){
+    const usaUn = !!state.cols.qtde, mot = pdMotivos(rows), g = pdAgrupa(mot, 'qtd', 5);
+    const cores = g.linhas.map((l,i) => l.outros ? PD.OUTROS : PD.PALETA[i]);
+    const rodape = 'TOTAL DE MOTIVOS: ' + mot.length + '      ' + (usaUn ? 'TOTAL DE PEÇAS N.C.: ' : 'TOTAL DE N.C.: ') + pdNum(g.total) + (usaUn ? ' UN' : '');
+    const s = pdBase(pres, area, pdSub('Motivo da não conformidade — Q.S.'), rodape);
+    pdRosca(pres, s, 3.15, 4.3, 4.4, g.linhas.map(l => l.qtd), cores, g.total, pdNum(g.total) + '\n' + (usaUn ? 'UN' : 'NC'), '0', 26);
+    const u = usaUn ? ' un' : ' NC';
+    pdLegendaDupla(s, g.linhas.map((l,i) => ({
+      cor: cores[i],
+      rotulo: l.outros ? 'OUTROS — ' + l.n + ' DEMAIS MOTIVOS' : pdMotivoRotulo(l.motivo),
+      detalhe: pdNum(l.qtd) + u + ' / ' + pdPct(g.total ? l.qtd/g.total*100 : 0),
+    })));
+  }
+  function pdSlideValor(pres, area, rows){
+    const m = pdItens(rows);
+    if(!m.temValor) return false;
+    const top = pdTop(m.itens, 'valor', 3);
+    if(!top.length) return false;
+    const somaTop = top.reduce((a,l) => a + l.valor, 0), totalGeral = m.itens.reduce((a,l) => a + (l.valor||0), 0);
+    const cores = top.map((l,i) => PD.PALETA[i]);
+    const s = pdBase(pres, area, pdSub('Top 3 itens por valor — Qtde. × valor unitário'), 'VALOR TOTAL EM N.C.: ' + pdMoeda(totalGeral));
+    pdRosca(pres, s, 3.15, 4.3, 4.4, top.map(l => l.valor), cores, somaTop, 'TOP 3\n' + pdMoeda(somaTop), '0.00', 16);
+    pdLegendaLinha(s, top.map((l,i) => ({
+      cor: cores[i], negrito: l.codigo, resto: ' — ' + pdTrunc(String(l.descricao||'').toUpperCase(), 40), valor: pdMoeda(l.valor),
+    })));
+    return true;
+  }
+  // Os 3 slides de uma área. Retorna false se o slide de valor foi pedido mas não há coluna de valor.
+  function pdSlidesArea(pres, area, rows, comValor){
+    if(!rows.length) return true;
+    pdSlideItens(pres, area, rows);
+    pdSlideMotivos(pres, area, rows);
+    return comValor ? pdSlideValor(pres, area, rows) : true;
+  }
+
+  async function pdExecutar(btn, arquivo, montar){
+    btn.disabled = true; const orig = btn.textContent; btn.textContent = 'Carregando...';
+    try{ await ensureLib('pptx'); }
+    catch(err){ alert('Não foi possível carregar a biblioteca de geração de PowerPoint: ' + err.message); btn.disabled = false; btn.textContent = orig; return; }
+    btn.textContent = 'Gerando...';
+    try{
       const pres = new PptxGenJS();
       pres.layout = 'LAYOUT_WIDE';
-
-      // Capa
-      const s1 = pres.addSlide();
-      s1.background = { color: WHITE };
-      s1.addImage({ data: LOGO_B64, x:5.4, y:0.6, w:2.5, h:2.27 });
-      s1.addText('INDICADORES DE NÃO CONFORMIDADE', { x:0.8, y:3.15, w:11.7, h:1.1, fontFace:TITLE_FONT, fontSize:38, color:LOGO_DARK, align:'center', valign:'middle', shrinkText:true });
-      s1.addShape('rect', { x:4.67, y:4.3, w:4.0, h:0.055, fill:{color:LOGO_DARK}, line:{type:'none'} });
-      s1.addText('UNIDADE 1  ·  INDICADORES INTERNOS E EXTERNOS', { x:0.8, y:4.45, w:11.7, h:0.5, fontFace:TITLE_FONT, fontSize:18, color:GREEN_HEX_U1, align:'center' });
-      s1.addText('Linhas avaliadas: P1 - ' + U1_SETORES[0].nome + '  ·  PL - ' + U1_SETORES[1].nome + '  ·  P3 - ' + U1_SETORES[2].nome, { x:0.8, y:5.05, w:11.7, h:0.5, fontFace:'Calibri', fontSize:12, italic:true, color:'595959', align:'center' });
-
-      // KPI Interno / Externo
-      function kpiSlide(titulo, subtitulo, counts, totalInd, accentColor, accentSoft, totalLabel){
-        const slide = pres.addSlide();
-        tableSlideHeader(slide, titulo, subtitulo);
-        const boxW=2.85, boxH=2.0, gapX=0.25, startX=0.5, y=1.7;
-        U1_SETORES.forEach((s,idx) => {
-          const x = startX + idx*(boxW+gapX);
-          const nc = counts[s.cod];
-          slide.addShape('roundRect', { x, y, w:boxW, h:boxH, fill:{color:WHITE}, line:{color:'DDE3DE', width:1} });
-          slide.addShape('roundRect', { x:x+0.18, y:y+0.18, w:0.55, h:0.4, fill:{color:accentSoft}, line:{type:'none'} });
-          slide.addText(s.cod, { x:x+0.18, y:y+0.18, w:0.55, h:0.4, fontFace:'Calibri', fontSize:13, bold:true, color:accentColor, align:'center', valign:'middle', margin:0 });
-          slide.addText(s.nome, { x:x+0.18, y:y+0.62, w:boxW-0.36, h:0.55, fontFace:'Calibri', fontSize:10.5, color:'595959' });
-          slide.addText(String(nc), { x:x+0.18, y:y+1.12, w:boxW-0.36, h:0.62, fontFace:'Consolas', fontSize:32, bold:true, color:DARK, margin:0 });
-          slide.addText(nc+' de '+d.total+' NCs ('+pct(nc)+')', { x:x+0.18, y:y+1.68, w:boxW-0.36, h:0.3, fontFace:'Calibri', fontSize:9.5, color:'595959', margin:0 });
-        });
-        const xt = startX + 3*(boxW+gapX);
-        slide.addShape('roundRect', { x:xt, y, w:boxW, h:boxH, fill:{color:accentSoft}, line:{color:accentColor, width:1} });
-        slide.addText(totalLabel, { x:xt+0.18, y:y+0.2, w:boxW-0.36, h:0.55, fontFace:'Calibri', fontSize:11, bold:true, color:accentColor });
-        slide.addText(String(totalInd), { x:xt+0.18, y:y+0.85, w:boxW-0.36, h:0.7, fontFace:'Consolas', fontSize:34, bold:true, color:accentColor, margin:0 });
-        slide.addText(pct(totalInd)+' do total de NCs', { x:xt+0.18, y:y+1.55, w:boxW-0.36, h:0.35, fontFace:'Calibri', fontSize:9.5, color:accentColor, margin:0 });
-      }
-      kpiSlide('Indicadores Internos', 'Não conformidades identificadas pela própria linha — coluna "C.C. Identifiou"', d.countInterno, d.totalInterno, GREEN_HEX_U1, 'E6F4EB', 'TOTAL INTERNO\n(3 linhas)');
-      kpiSlide('Indicadores Externos', 'Não conformidades originadas na linha — coluna "C.C Origem do Problema"', d.countExterno, d.totalExterno, RED_HEX_U1, 'FFE6E6', 'TOTAL EXTERNO\n(3 linhas)');
-
-      // Top 3 Motivos — Interno x Externo (dois donuts)
-      const sMot = pres.addSlide();
-      tableSlideHeader(sMot, 'Top 3 Motivos NC - Interno X Externo', 'Motivos mais frequentes somando as três linhas (P1 + PL + P3), em cada indicador');
-      const pieSize=2.6, pieY=2.15;
-      const GREEN_RAMP_U1 = ['009135','83CF00','ADEBB3'];
-      const RED_RAMP_U1 = ['FF0000','FF9B02','E8D166'];
-      u1MotivosPie(pres, sMot, 0.5, pieY, pieSize, d.motivosInterno, GREEN_RAMP_U1, 'INDICADOR INTERNO  ('+d.totalInterno+' NCs)');
-      sMot.addText('X', { x:6.15, y:pieY+pieSize/2-0.45, w:1.0, h:0.9, fontFace:'Georgia', fontSize:34, bold:true, color:'BFC7C1', align:'center', valign:'middle' });
-      u1MotivosPie(pres, sMot, 7.45, pieY, pieSize, d.motivosExterno, RED_RAMP_U1, 'INDICADOR EXTERNO  ('+d.totalExterno+' NCs)');
-
-      // Top 3 Itens — um slide por setor, Interno (verde) + Externo (vermelho) empilhados
-      U1_SETORES.forEach(s => {
-        const itensInt = d.itensInterno[s.cod], itensExt = d.itensExterno[s.cod];
-        if(!itensInt.length && !itensExt.length) return;
-        const slide = pres.addSlide();
-        tableSlideHeader(slide, 'Top 3 Itens — ' + s.cod, s.nome);
-        let y = 1.65;
-        if(itensInt.length){
-          slide.addText('INDICADOR INTERNO  ('+d.countInterno[s.cod]+' NCs)', { x:0.5, y, w:12.3, h:0.3, fontFace:'Calibri', fontSize:12, bold:true, color:GREEN_HEX_U1 });
-          y += 0.35;
-          y += u1ItensTable(slide, itensInt, y, GREEN_HEX_U1);
-          y += 0.35;
-        }
-        if(itensExt.length){
-          slide.addText('INDICADOR EXTERNO  ('+d.countExterno[s.cod]+' NCs)', { x:0.5, y, w:12.3, h:0.3, fontFace:'Calibri', fontSize:12, bold:true, color:RED_HEX_U1 });
-          y += 0.35;
-          u1ItensTable(slide, itensExt, y, RED_HEX_U1);
-        }
-      });
-
-      // Comparativo Interno x Externo (gráfico de barras)
-      const s7 = pres.addSlide();
-      tableSlideHeader(s7, 'Comparativo: Interno x Externo', 'Quantidade de não conformidades por linha, nos dois indicadores');
-      s7.addChart(pres.ChartType.bar, [
-        { name:'Indicador Interno', labels:U1_SETORES.map(s=>s.cod), values:U1_SETORES.map(s=>d.countInterno[s.cod]) },
-        { name:'Indicador Externo', labels:U1_SETORES.map(s=>s.cod), values:U1_SETORES.map(s=>d.countExterno[s.cod]) },
-      ], {
-        x:0.6, y:1.6, w:12.0, h:4.6, barDir:'col', barGapWidthPct:35,
-        chartColors:[GREEN_HEX_U1, RED_HEX_U1],
-        showTitle:false, showLegend:true, legendPos:'b', legendColor:DARK, legendFontSize:12,
-        showValue:true, dataLabelColor:DARK, dataLabelFontSize:11, dataLabelPosition:'outEnd',
-        catAxisLabelColor:DARK, catAxisLabelFontSize:13, catAxisLabelFontFace:'Calibri',
-        valAxisLabelColor:'595959', valAxisLabelFontSize:10,
-        valGridLine:{color:'E4E7E1', size:1}, catGridLine:{style:'none'},
-        valAxisTitle:'Nº de não conformidades', showValAxisTitle:true, valAxisTitleColor:'595959', valAxisTitleFontSize:11,
-      });
-
-      await pres.writeFile({ fileName: 'Slides_Unidade_1.pptx' });
+      const r = await montar(pres);
+      if(r === 'cancelado') return;
+      await pres.writeFile({ fileName: arquivo });
+      if(r === 'sem-valor') showToast('Slide de valor (R$) não gerado: o arquivo não tem coluna de valor unitário.');
     }catch(err){
-      alert('Erro ao gerar Slides Unidade 1: ' + err.message);
+      alert('Erro ao gerar slides: ' + err.message);
     }finally{
-      btnSlidesU1.disabled = false; btnSlidesU1.textContent = orig;
+      btn.disabled = false; btn.textContent = orig;
     }
+  }
+
+  // ---------------- Slides Não Conformidades (visão geral do arquivo) ----------------
+  function generateTableSlides(){
+    return pdExecutar(btnSlidesTables, 'Slides_Nao_Conformidades.pptx', pres => {
+      const ok = pdSlidesArea(pres, 'GERAL', state.ncRows, true);
+      return ok ? 'ok' : 'sem-valor';
+    });
+  }
+  btnSlidesTables.addEventListener('click', generateTableSlides);
+
+  // ---------------- Slides por Setor (um conjunto padrão por setor) ----------------
+  function generateSetorSlides(){
+    return pdExecutar(btnSlidesSetor, 'Tabelas_NC_Setor.pptx', pres => {
+      if(!state.setorAgg){ alert('Não foi possível identificar a coluna "Cadastrado Por" no arquivo enviado, então não é possível gerar os slides por setor.'); return 'cancelado'; }
+      const nameCol = state.cols.cadastradoPor || state.cols.operador;
+      let semValor = false;
+      state.setorAgg.filter(s => s.setor !== 'Não mapeado').forEach(s => {
+        const rows = state.ncRows.filter(r => setorDeCadastro(r[nameCol]==null ? '' : r[nameCol].toString().trim()) === s.setor);
+        if(!pdSlidesArea(pres, s.setor.toUpperCase(), rows, true)) semValor = true;
+      });
+      return semValor ? 'sem-valor' : 'ok';
+    });
+  }
+  btnSlidesSetor.addEventListener('click', generateSetorSlides);
+
+  // ---------------- Slides Unidade 1 (itens + motivos + interno x externo, sem slide de valor) ----------------
+  function pdKpiU1(pres, d, interno){
+    const counts = interno ? d.countInterno : d.countExterno, totalInd = interno ? d.totalInterno : d.totalExterno;
+    const acc = interno ? PD.ESCURO : '2F5597', soft = interno ? 'E2F0D9' : 'DEEAF6';
+    const sub = interno ? 'Indicadores internos — NCs identificadas pela própria linha' : 'Indicadores externos — NCs originadas na linha e identificadas por outro setor';
+    const s = pdBase(pres, 'UNIDADE 1', pdSub(sub), 'TOTAL DE NCs: ' + d.total + '      TOTAL ' + (interno ? 'INTERNO' : 'EXTERNO') + ': ' + totalInd);
+    const boxW = 2.95, boxH = 2.4, gap = 0.25, x0 = 0.4, y = 3.0;
+    U1_SETORES.forEach((st, idx) => {
+      const x = x0 + idx*(boxW+gap), nc = counts[st.cod];
+      s.addShape('roundRect', { x, y, w:boxW, h:boxH, fill:{color:'FFFFFF'}, line:{color:'D9D9D9', width:1}, rectRadius:0.08 });
+      s.addShape('roundRect', { x:x+0.2, y:y+0.2, w:0.6, h:0.4, fill:{color:soft}, line:{type:'none'}, rectRadius:0.06 });
+      s.addText(st.cod, { x:x+0.2, y:y+0.2, w:0.6, h:0.4, fontFace:PD.FONTE, fontSize:13, bold:true, color:acc, align:'center', valign:'middle', margin:0, isTextBox:true });
+      s.addText(st.nome, { x:x+0.2, y:y+0.68, w:boxW-0.4, h:0.55, fontFace:PD.FONTE, fontSize:10.5, color:PD.CINZA, valign:'top', margin:0, isTextBox:true });
+      s.addText(String(nc), { x:x+0.2, y:y+1.2, w:boxW-0.4, h:0.7, fontFace:PD.FONTE, fontSize:36, bold:true, color:PD.ESCURO, valign:'middle', margin:0, isTextBox:true });
+      s.addText(nc + ' de ' + d.total + ' NCs (' + pdPct(d.total ? nc/d.total*100 : 0) + ')', { x:x+0.2, y:y+1.95, w:boxW-0.4, h:0.3, fontFace:PD.FONTE, fontSize:10, color:PD.CINZA, margin:0, isTextBox:true });
+    });
+    const xt = x0 + 3*(boxW+gap);
+    s.addShape('roundRect', { x:xt, y, w:boxW, h:boxH, fill:{color:soft}, line:{color:acc, width:1.25}, rectRadius:0.08 });
+    s.addText('TOTAL ' + (interno ? 'INTERNO' : 'EXTERNO') + '\n(3 linhas)', { x:xt+0.2, y:y+0.2, w:boxW-0.4, h:0.6, fontFace:PD.FONTE, fontSize:11, bold:true, color:acc, margin:0, isTextBox:true });
+    s.addText(String(totalInd), { x:xt+0.2, y:y+1.0, w:boxW-0.4, h:0.8, fontFace:PD.FONTE, fontSize:40, bold:true, color:acc, valign:'middle', margin:0, isTextBox:true });
+    s.addText(pdPct(d.total ? totalInd/d.total*100 : 0) + ' do total de NCs', { x:xt+0.2, y:y+1.95, w:boxW-0.4, h:0.3, fontFace:PD.FONTE, fontSize:10, color:acc, margin:0, isTextBox:true });
+  }
+  function pdMotivosLado(pres, s, x0, titulo, motivos, cores, corTitulo, totalInd){
+    s.addText(titulo, { x:x0, y:2.0, w:5.6, h:0.4, fontFace:PD.FONTE, fontSize:13, bold:true, color:corTitulo, margin:0, isTextBox:true });
+    if(!motivos.length){
+      s.addText('Sem registros neste indicador.', { x:x0, y:3.8, w:5.6, h:0.4, fontFace:PD.FONTE, fontSize:12, italic:true, color:PD.CINZA, margin:0, isTextBox:true });
+      return;
+    }
+    // Top 3 vêm de computeUnidade1Data; o restante do indicador entra como "OUTROS MOTIVOS" (total − soma do top 3)
+    const linhas = motivos.map(m => ({ rotulo: pdMotivoRotulo(m.motivo), qtd: m.qtd }));
+    const resto = (totalInd || 0) - motivos.reduce((a,m) => a + m.qtd, 0);
+    if(resto > 0) linhas.push({ rotulo:'OUTROS MOTIVOS', qtd:resto, outros:true });
+    const total = linhas.reduce((a,l) => a + l.qtd, 0), size = 2.9, cy = 4.35;
+    const cs = linhas.map((l,i) => l.outros ? PD.OUTROS : cores[i]);
+    pdRosca(pres, s, x0 + size/2, cy, size, linhas.map(l => l.qtd), cs, total, String(total) + '\nNCs', '0', 18);
+    const passo = 0.68, ly0 = cy - passo*(linhas.length-1)/2;
+    linhas.forEach((l, i) => {
+      const yc = ly0 + i*passo;
+      s.addShape('rect', { x:x0 + size + 0.2, y:yc-0.08, w:0.16, h:0.16, fill:{color:cs[i]}, line:{type:'none'} });
+      s.addText([
+        { text:l.rotulo, options:{ bold:true, color:PD.CINZA, fontSize:10, breakLine:true } },
+        { text:l.qtd + (l.qtd === 1 ? ' NC / ' : ' NCs / ') + pdPct(total ? l.qtd/total*100 : 0), options:{ bold:true, color:PD.ESCURO, fontSize:10 } },
+      ], { x:x0 + size + 0.45, y:yc-passo/2+0.02, w:2.6, h:passo-0.04, fontFace:PD.FONTE, valign:'middle', margin:0, isTextBox:true });
+    });
+  }
+  function pdMotivosU1(pres, d){
+    const s = pdBase(pres, 'UNIDADE 1', pdSub('Top 3 motivos NC — interno × externo (P1 + PL + P3)'), 'TOTAL INTERNO: ' + d.totalInterno + '      TOTAL EXTERNO: ' + d.totalExterno);
+    pdMotivosLado(pres, s, 0.4, 'INDICADOR INTERNO  (' + d.totalInterno + ' NCs)', d.motivosInterno, PD.VERDES, PD.ESCURO, d.totalInterno);
+    s.addText('×', { x:6.15, y:3.85, w:1.0, h:0.9, fontFace:PD.FONTE, fontSize:36, bold:true, color:'A6A6A6', align:'center', valign:'middle', margin:0, isTextBox:true });
+    pdMotivosLado(pres, s, 7.2, 'INDICADOR EXTERNO  (' + d.totalExterno + ' NCs)', d.motivosExterno, PD.AZUIS, '2F5597', d.totalExterno);
+  }
+  function pdItensLado(pres, s, x0, titulo, itens, cores, corTitulo){
+    s.addText(titulo, { x:x0, y:2.0, w:5.6, h:0.4, fontFace:PD.FONTE, fontSize:13, bold:true, color:corTitulo, margin:0, isTextBox:true });
+    if(!itens.length){
+      s.addText('Sem registros neste indicador.', { x:x0, y:3.8, w:5.6, h:0.4, fontFace:PD.FONTE, fontSize:12, italic:true, color:PD.CINZA, margin:0, isTextBox:true });
+      return;
+    }
+    const total = itens.reduce((a,it) => a + it.ocorr, 0), size = 2.9, cy = 4.35;
+    pdRosca(pres, s, x0 + size/2, cy, size, itens.map(it => it.ocorr), cores.slice(0, itens.length), total, 'TOP 3\n' + total + ' NCs', '0', 15);
+    const passo = 0.8, ly0 = cy - passo*(itens.length-1)/2;
+    itens.forEach((it, i) => {
+      const yc = ly0 + i*passo;
+      s.addShape('rect', { x:x0 + size + 0.2, y:yc-0.08, w:0.16, h:0.16, fill:{color:cores[i]}, line:{type:'none'} });
+      s.addText([
+        { text:it.codigo, options:{ bold:true, color:PD.CINZA, fontSize:10 } },
+        { text:' — ' + pdTrunc(String(it.desc||'—').toUpperCase(), 34), options:{ bold:false, color:PD.CINZA, fontSize:10, breakLine:true } },
+        { text:it.ocorr + (it.ocorr === 1 ? ' NC' : ' NCs') + ' · ' + pdNum(it.unid) + ' un', options:{ bold:true, color:PD.ESCURO, fontSize:10 } },
+      ], { x:x0 + size + 0.45, y:yc-passo/2+0.02, w:2.3, h:passo-0.04, fontFace:PD.FONTE, valign:'middle', margin:0, isTextBox:true });
+    });
+  }
+  function pdItensU1(pres, d, st){
+    const itInt = d.itensInterno[st.cod], itExt = d.itensExterno[st.cod];
+    if(!itInt.length && !itExt.length) return;
+    const s = pdBase(pres, 'UNIDADE 1', pdSub('Top 3 itens — ' + st.cod + ' · ' + st.nome), 'TOTAL INTERNO: ' + d.countInterno[st.cod] + '      TOTAL EXTERNO: ' + d.countExterno[st.cod]);
+    pdItensLado(pres, s, 0.4, 'INDICADOR INTERNO  (' + d.countInterno[st.cod] + ' NCs)', itInt, PD.VERDES, PD.ESCURO);
+    s.addText('×', { x:6.15, y:3.85, w:1.0, h:0.9, fontFace:PD.FONTE, fontSize:36, bold:true, color:'A6A6A6', align:'center', valign:'middle', margin:0, isTextBox:true });
+    pdItensLado(pres, s, 7.2, 'INDICADOR EXTERNO  (' + d.countExterno[st.cod] + ' NCs)', itExt, PD.AZUIS, '2F5597');
+  }
+  // Linhas que compõem a Unidade 1 (NC interna OU externa de P1/PL/P3), sem duplicar.
+  // Mesmo critério de computeUnidade1Data, só para reunir as linhas que alimentam os slides de itens/motivos.
+  function pdLinhasU1(){
+    const cols = state.cols || {}, rows = state.rawRows || [], set = new Set();
+    U1_SETORES.forEach(st => {
+      const t = keyOf(st.nome);
+      const bate = (ck, r) => cols[ck] ? keyOf(r[cols[ck]]||'').includes(t) : false;
+      rows.forEach(r => { if(bate('identificou', r) || bate('origemProblema', r)) set.add(r); });
+    });
+    return rows.filter(r => set.has(r));
+  }
+  function generateUnidade1Slides(){
+    return pdExecutar(btnSlidesU1, 'Slides_Unidade_1.pptx', pres => {
+      const cols = state.cols || {};
+      if(!cols.identificou){ alert('Não foi possível identificar a coluna "C.C. Identifiou" (Setor que Identificou o Problema) no arquivo enviado — os Slides Unidade 1 precisam dela para calcular o indicador interno.'); return 'cancelado'; }
+      if(!cols.origemProblema){ alert('Não foi possível identificar a coluna "C.C Origem do Problema" no arquivo enviado — os Slides Unidade 1 precisam dela para calcular o indicador externo.'); return 'cancelado'; }
+      const d = computeUnidade1Data();
+      const rowsU1 = pdLinhasU1();
+      pdSlidesArea(pres, 'UNIDADE 1', rowsU1, false);   // sem slide de valor nesta área
+      pdKpiU1(pres, d, true);
+      pdKpiU1(pres, d, false);
+      pdMotivosU1(pres, d);
+      U1_SETORES.forEach(st => pdItensU1(pres, d, st));
+      return 'ok';
+    });
   }
   btnSlidesU1.addEventListener('click', generateUnidade1Slides);
 
