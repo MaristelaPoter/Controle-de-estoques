@@ -4,8 +4,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Controle estoques 023/014</title>
-<link rel="icon" type="image/png" href="favicon.png">
-  <style>
+<style>
   :root{
     --ink:#181D1A; --ink-muted:#5C6660; --ink-faint:#8B948E;
     --paper:#F6F7F4; --surface:#FFFFFF; --line:#E4E7E1; --line-strong:#CBD2CA;
@@ -1998,6 +1997,11 @@
     const qtdTotal = abertos.reduce((s,r)=> s + (r.quantidade||0), 0);
     const comValor = abertos.filter(r => r.valorUnitario!=null && r.quantidade!=null);
     const custoTotal = comValor.reduce((s,r)=> s + r.valorUnitario*r.quantidade, 0);
+    // Quantidade em estoque (soma da coluna "Qtde.") dos itens em aberto, separada por depósito
+    const abertosDep = dep => abertos.filter(r => String(r.deposito||'').trim() === dep);
+    const qtdDep = dep => abertosDep(dep).reduce((s,r)=> s + (r.quantidade||0), 0);
+    const qtd014 = qtdDep('014'), qtd023 = qtdDep('023');
+    const subDep = dep => abertosDep(dep).length + ' item(ns) em aberto';
 
     document.getElementById('ledgerAberto').innerHTML = '<div class="ledger">' +
       '<div class="ledger-item"><div class="label">Em Aberto</div><div class="value">'+fmtInt(abertos.length)+'</div><div class="sub">'+fmtInt(qtdTotal)+' unidades no total · '+renderTrend(abertos)+'</div></div>' +
@@ -2005,6 +2009,8 @@
       '<div class="ledger-item '+(maxDias>=10?'accent':'')+'"><div class="label">Itens Mais Antigos</div><div class="value">'+fmtInt(itensNoMax)+'</div><div class="sub">com '+maxDias+' dia'+(maxDias===1?'':'s')+' em aberto</div></div>' +
       '<div class="ledger-item '+(criticos>0?'accent':'good')+'"><div class="label">Críticos (≥10 dias)</div><div class="value">'+fmtInt(criticos)+'</div></div>' +
       '<div class="ledger-item"><div class="label">Custo Total em Aberto</div><div class="value" style="font-size:20px;">'+fmtBRL(custoTotal)+'</div><div class="sub">'+comValor.length+' de '+abertos.length+' registro(s) com valor informado</div></div>' +
+      '<div class="ledger-item"><div class="label">Qtde. em Estoque — Depósito 014</div><div class="value">'+fmtInt(qtd014)+'</div><div class="sub">'+subDep('014')+'</div></div>' +
+      '<div class="ledger-item"><div class="label">Qtde. em Estoque — Depósito 023</div><div class="value">'+fmtInt(qtd023)+'</div><div class="sub">'+subDep('023')+'</div></div>' +
     '</div>';
     renderBreakdown(abertos, 'breakdownAberto');
     renderDestaqueValor(abertos);
