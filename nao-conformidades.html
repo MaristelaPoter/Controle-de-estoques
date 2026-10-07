@@ -1922,7 +1922,14 @@
             if(mCod) it.motivos.set(mCod, (it.motivos.get(mCod)||0)+1);
           }
         });
-        out[s.cod] = Array.from(byItem.values()).sort((a,b)=> b.ocorr - a.ocorr).slice(0,3).map(it => ({
+        // Critério do top 3 (considera os DOIS fatores): recorrência (nº de NCs) e quantidade de peças.
+        // Pontuação = NCs ÷ maior nº de NCs da linha + peças ÷ maior quantidade de peças da linha (mesmo indicador).
+        // Assim entram tanto o item que se repete muito quanto o item com uma única NC de quantidade alta.
+        // Desempate: mais peças, depois mais NCs.
+        const lista = Array.from(byItem.values());
+        const maxO = Math.max(0, ...lista.map(x => x.ocorr)) || 1, maxU = Math.max(0, ...lista.map(x => x.unid)) || 1;
+        const pontos = x => x.ocorr/maxO + x.unid/maxU;
+        out[s.cod] = lista.sort((a,b)=> (pontos(b) - pontos(a)) || (b.unid - a.unid) || (b.ocorr - a.ocorr)).slice(0,3).map(it => ({
           codigo: it.codigo, desc: it.desc || '—', ocorr: it.ocorr, unid: Math.round(it.unid),
           motivo: Array.from(it.motivos.entries()).map(([c,q])=>c+' ('+q+')').join(', ') || '—'
         }));
@@ -2064,7 +2071,7 @@
       });
     }
     const itens = agg.map(it => ({
-      codigo: it.codigo, descricao: it.descricao,
+      codigo: it.codigo, descricao: it.descricao, ocorr: it.ocorrencias,
       qtd: usaUn ? it.unidades : it.ocorrencias,
       valor: colV ? (vmap.get(it.codigo + '||' + it.descricao) || 0) : null,
     }));
@@ -2078,6 +2085,16 @@
       map.set(v, (map.get(v)||0) + (usaUn ? (parseFloat(r[cols.qtde]) || 0) : 1));
     });
     return Array.from(map, ([motivo, qtd]) => ({ motivo, qtd })).sort((a,b) => b.qtd - a.qtd);
+  }
+  // Top N considerando os DOIS fatores: recorrência (nº de NCs) e quantidade de peças.
+  // Pontuação = NCs ÷ maior nº de NCs + peças ÷ maior quantidade de peças (mesma regra da Unidade 1 por linha).
+  // Desempate: mais peças, depois mais NCs. O resultado é exibido do maior para o menor em peças.
+  function pdTopCombinado(lista, n){
+    const L = lista.filter(x => (x.qtd||0) > 0);
+    const maxO = Math.max(0, ...L.map(x => x.ocorr||0)) || 1, maxQ = Math.max(0, ...L.map(x => x.qtd||0)) || 1;
+    const pontos = x => (x.ocorr||0)/maxO + (x.qtd||0)/maxQ;
+    return L.slice().sort((a,b) => (pontos(b) - pontos(a)) || (b.qtd - a.qtd) || ((b.ocorr||0) - (a.ocorr||0))).slice(0, n)
+            .sort((a,b) => (b.qtd - a.qtd) || ((b.ocorr||0) - (a.ocorr||0)));
   }
   // Somente os N maiores (sem agrupar o restante)
   function pdTop(lista, campo, n){ return lista.filter(x => (x[campo]||0) > 0).sort((a,b) => b[campo] - a[campo]).slice(0, n); }
@@ -2173,7 +2190,7 @@
   // permiteValor: o valor total (R$) só entra, entre parênteses, quando true e o arquivo tem coluna de valor unitário.
   function pdSlideUnico(pres, area, rows, permiteValor){
     if(!rows.length) return;
-    const m = pdItens(rows), top = pdTop(m.itens, 'qtd', 3);
+    const m = pdItens(rows), top = pdTopCombinado(m.itens, 3);
     if(!top.length) return;
     const un = m.usaUn ? ' UN' : ' NC', unMin = m.usaUn ? ' un' : ' NC';
     const soma = top.reduce((a,l) => a + l.qtd, 0);
@@ -2288,17 +2305,22 @@
       s.addText('Sem registros neste indicador.', { x:x0, y:3.8, w:5.6, h:0.4, fontFace:PD.FONTE, fontSize:12, italic:true, color:PD.CINZA, margin:0, isTextBox:true });
       return;
     }
-    // % de cada fatia sobre o total mostrado no centro; descrição COMPLETA do item, com quebra de linha
-    const total = itens.reduce((a,it) => a + it.ocorr, 0), size = 2.6, cy = 4.5, wLeg = 2.65, passo = 1.3;
-    pdRosca(pres, s, x0 + size/2, cy, size, itens.map(it => it.ocorr), cores.slice(0, itens.length), total, 'TOP 3\n' + total + ' NCs', '0', 15);
-    const ly0 = cy - passo*(itens.length-1)/2;
-    itens.forEach((it, i) => {
+    // A rosca e os % são calculados sobre a QUANTIDADE DE PEÇAS (soma da coluna "Qtde."), sem exibir a contagem de NCs.
+    // (Sem coluna de quantidade no arquivo, recorre à contagem de ocorrências.) Os 3 itens são os mesmos de computeUnidade1Data;
+    // aqui só se ordena a exibição do maior para o menor valor mostrado.
+    const usaUn = !!(state.cols && state.cols.qtde), un = usaUn ? ' UN' : ' NC';
+    const val = it => usaUn ? it.unid : it.ocorr;
+    const ord = itens.slice().sort((a,b) => val(b) - val(a));
+    const total = ord.reduce((a,it) => a + val(it), 0), size = 2.6, cy = 4.5, wLeg = 2.65, passo = 1.3;
+    pdRosca(pres, s, x0 + size/2, cy, size, ord.map(val), cores.slice(0, ord.length), total, 'TOP 3\n' + pdNum(total) + un, '0', 15);
+    const ly0 = cy - passo*(ord.length-1)/2;
+    ord.forEach((it, i) => {
       const yc = ly0 + i*passo;
       s.addShape('rect', { x:x0 + size + 0.2, y:yc-passo/2+0.07, w:0.16, h:0.16, fill:{color:cores[i]}, line:{type:'none'} });
       s.addText([
         { text:it.codigo, options:{ bold:true, color:PD.CINZA, fontSize:10 } },
         { text:' — ' + String(it.desc||'—').toUpperCase(), options:{ bold:false, color:PD.CINZA, fontSize:10, breakLine:true } },
-        { text:it.ocorr + (it.ocorr === 1 ? ' NC' : ' NCs') + ' · ' + pdNum(it.unid) + ' un', options:{ bold:true, color:PD.ESCURO, fontSize:10 } },
+        { text:pdNum(val(it)) + un.toLowerCase(), options:{ bold:true, color:PD.ESCURO, fontSize:10 } },
       ], { x:x0 + size + 0.45, y:yc-passo/2+0.02, w:wLeg, h:passo-0.06, fontFace:PD.FONTE, valign:'top', margin:0, isTextBox:true });
     });
   }
@@ -2306,9 +2328,9 @@
     const itInt = d.itensInterno[st.cod], itExt = d.itensExterno[st.cod];
     if(!itInt.length && !itExt.length) return;
     const s = pdBase(pres, 'UNIDADE 1', pdSub('Top 3 itens — ' + st.cod + ' · ' + st.nome), '');
-    pdItensLado(pres, s, 0.4, 'INDICADOR INTERNO  (' + d.countInterno[st.cod] + ' NCs)', itInt, PD.VERDES, PD.ESCURO);
+    pdItensLado(pres, s, 0.4, 'INDICADOR INTERNO', itInt, PD.VERDES, PD.ESCURO);
     s.addText('×', { x:6.15, y:3.85, w:1.0, h:0.9, fontFace:PD.FONTE, fontSize:36, bold:true, color:'A6A6A6', align:'center', valign:'middle', margin:0, isTextBox:true });
-    pdItensLado(pres, s, 7.2, 'INDICADOR EXTERNO  (' + d.countExterno[st.cod] + ' NCs)', itExt, PD.AZUIS, '2F5597');
+    pdItensLado(pres, s, 7.2, 'INDICADOR EXTERNO', itExt, PD.AZUIS, '2F5597');
   }
   // Linhas que compõem a Unidade 1 (NC interna OU externa de P1/PL/P3), sem duplicar.
   // Mesmo critério de computeUnidade1Data, só para reunir as linhas que alimentam os slides de itens/motivos.
