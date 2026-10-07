@@ -2095,16 +2095,63 @@
     s.addText(pdAno(), { x:11.2, y:6.98, w:1.78, h:0.45, fontFace:PD.FONTE, bold:true, fontSize:22, color:PD.ESCURO, align:'right', valign:'middle', margin:0, isTextBox:true });
     return s;
   }
-  // Rosca com total no centro. Os rótulos das fatias são a PORCENTAGEM de cada fatia sobre o total mostrado no centro.
+  // Percentual no padrão brasileiro (vírgula); valores minúsculos viram "<0,1%"
+  function pdPctRotulo(p){ if(p > 0 && p < 0.1) return '<0,1%'; return p.toFixed(1).replace('.', ',') + '%'; }
+  // Linha reta entre dois pontos (usada nas linhas-guia dos rótulos)
+  function pdLinha(slide, x1, y1, x2, y2){
+    slide.addShape('line', { x:Math.min(x1,x2), y:Math.min(y1,y2), w:Math.abs(x2-x1), h:Math.abs(y2-y1), flipV:((x2-x1)*(y2-y1) < 0), line:{ color:'7F7F7F', width:0.75 } });
+  }
+  // Rosca com total no centro. A área do gráfico é fixada (80% da caixa), então o raio é conhecido e os rótulos
+  // são desenhados manualmente: dentro da fatia quando ela é grande; FORA, com linha-guia, quando é pequena
+  // (< 7%), com os rótulos afastados entre si para nunca se sobrepor. O % é sempre sobre o total do centro.
   function pdRosca(pres, slide, cx, cy, size, valores, cores, total, textoCentro, fmt, fonteCentro){
+    const F = 0.8, D = size * 0.94, S = D / F, R = D / 2;
     slide.addChart(pres.ChartType.doughnut, [{ name:'Série', labels: valores.map((v,i) => String(i+1)), values: valores }], {
-      x: cx - size/2, y: cy - size/2, w:size, h:size, holeSize:50, chartColors:cores,
-      showTitle:false, showLegend:false, showLabel:false, showValue:false, showPercent:true,
-      dataLabelColor:'000000', dataLabelFontSize:10, dataLabelFontBold:true, dataLabelFontFace:'Arial',
-      dataLabelFormatCode:'0.0%',
+      x: cx - S/2, y: cy - S/2, w:S, h:S, layout:{ x:(1-F)/2, y:(1-F)/2, w:F, h:F }, holeSize:50, chartColors:cores,
+      showTitle:false, showLegend:false, showLabel:false, showValue:false, showPercent:false,
       dataBorder:{ pt:1, color:'FFFFFF' },
     });
     slide.addText(textoCentro, { x: cx - 1.0, y: cy - 0.6, w:2.0, h:1.2, align:'center', valign:'middle', fontFace:PD.FONTE, bold:true, fontSize: fonteCentro || 26, color:PD.ESCURO, margin:0, isTextBox:true });
+
+    const soma = valores.reduce((a,v) => a + (v > 0 ? v : 0), 0);
+    if(!soma) return;
+    const rad = a => a * Math.PI / 180, W = 0.62, H = 0.22, LIM = 7;
+    const pos = (ang, r) => ({ x: cx + r*Math.sin(rad(ang)), y: cy - r*Math.cos(rad(ang)) });
+    const fatias = []; let acum = 0;
+    valores.forEach(v => { if(!(v > 0)) return; const f = v / soma; fatias.push({ pct:f*100, mid:(acum + f/2) * 360 }); acum += f; });
+    const estilo = { fontFace:PD.FONTE, bold:true, fontSize:10, color:'000000', align:'center', valign:'middle', margin:0, isTextBox:true };
+    // fatias grandes: rótulo dentro, no meio do anel
+    fatias.filter(f => f.pct >= LIM).forEach(f => {
+      const q = pos(f.mid, R*0.75);
+      slide.addText(pdPctRotulo(f.pct), Object.assign({ x:q.x - W/2, y:q.y - H/2, w:W, h:H }, estilo));
+    });
+    // fatias pequenas: rótulo fora + linha-guia
+    const pq = fatias.filter(f => f.pct < LIM);
+    if(!pq.length) return;
+    const Rl = R + 0.32;
+    pq.forEach(f => { f.a = f.mid > 180 ? f.mid - 360 : f.mid; });   // -180..180 para o topo ficar contínuo
+    pq.sort((a,b) => a.a - b.a);
+    const precisa = (a, b) => { const m = rad((a+b)/2); return (Math.abs(Math.cos(m))*W + Math.abs(Math.sin(m))*H) / (Rl + 0.25) * 180/Math.PI; };
+    for(let it = 0; it < 300; it++){
+      let mexeu = false;
+      for(let k = 1; k < pq.length; k++){
+        const need = precisa(pq[k-1].a, pq[k].a), d = pq[k].a - pq[k-1].a;
+        if(d < need - 0.01){ const e = (need - d) / 2; pq[k-1].a -= e; pq[k].a += e; mexeu = true; }
+      }
+      if(!mexeu) break;
+    }
+    pq.forEach(f => {
+      f.a = Math.max(-175, Math.min(175, f.a));
+      const borda = pos(f.mid, R - 0.03), cotovelo = pos(f.mid, R + 0.12), ponta = pos(f.a, Rl);
+      const sa = Math.sin(rad(f.a)), ca = Math.cos(rad(f.a));
+      const centro = { x: ponta.x + sa*(Math.abs(sa)*W/2 + Math.abs(ca)*H/2) / (Math.abs(sa) + Math.abs(ca) || 1),
+                       y: ponta.y - ca*(Math.abs(sa)*W/2 + Math.abs(ca)*H/2) / (Math.abs(sa) + Math.abs(ca) || 1) };
+      let bx = centro.x - W/2; const by = centro.y - H/2;
+      bx = Math.max(0.15, Math.min(13.18 - W, bx));
+      pdLinha(slide, borda.x, borda.y, cotovelo.x, cotovelo.y);
+      pdLinha(slide, cotovelo.x, cotovelo.y, ponta.x, ponta.y);
+      slide.addText(pdPctRotulo(f.pct), Object.assign({ x:bx, y:by, w:W, h:H }, estilo));
+    });
   }
 
   // ---------- slide ÚNICO de um setor: rosca top 3 itens + motivos de cada item (+ valor total, se houver) ----------
