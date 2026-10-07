@@ -2253,27 +2253,6 @@
   btnSlidesSetor.addEventListener('click', generateSetorSlides);
 
   // ---------------- Slides Unidade 1 (itens + motivos + interno x externo, sem slide de valor) ----------------
-  function pdKpiU1(pres, d, interno){
-    const counts = interno ? d.countInterno : d.countExterno, totalInd = interno ? d.totalInterno : d.totalExterno;
-    const acc = interno ? PD.ESCURO : '2F5597', soft = interno ? 'E2F0D9' : 'DEEAF6';
-    const sub = interno ? 'Indicadores internos — NCs identificadas pela própria linha' : 'Indicadores externos — NCs originadas na linha e identificadas por outro setor';
-    const s = pdBase(pres, 'UNIDADE 1', pdSub(sub), '');
-    const boxW = 2.95, boxH = 2.4, gap = 0.25, x0 = 0.4, y = 3.0;
-    U1_SETORES.forEach((st, idx) => {
-      const x = x0 + idx*(boxW+gap), nc = counts[st.cod];
-      s.addShape('roundRect', { x, y, w:boxW, h:boxH, fill:{color:'FFFFFF'}, line:{color:'D9D9D9', width:1}, rectRadius:0.08 });
-      s.addShape('roundRect', { x:x+0.2, y:y+0.2, w:0.6, h:0.4, fill:{color:soft}, line:{type:'none'}, rectRadius:0.06 });
-      s.addText(st.cod, { x:x+0.2, y:y+0.2, w:0.6, h:0.4, fontFace:PD.FONTE, fontSize:13, bold:true, color:acc, align:'center', valign:'middle', margin:0, isTextBox:true });
-      s.addText(st.nome, { x:x+0.2, y:y+0.68, w:boxW-0.4, h:0.55, fontFace:PD.FONTE, fontSize:10.5, color:PD.CINZA, valign:'top', margin:0, isTextBox:true });
-      s.addText(String(nc), { x:x+0.2, y:y+1.2, w:boxW-0.4, h:0.7, fontFace:PD.FONTE, fontSize:36, bold:true, color:PD.ESCURO, valign:'middle', margin:0, isTextBox:true });
-      s.addText(nc + ' de ' + d.total + ' NCs (' + pdPct(d.total ? nc/d.total*100 : 0) + ')', { x:x+0.2, y:y+1.95, w:boxW-0.4, h:0.3, fontFace:PD.FONTE, fontSize:10, color:PD.CINZA, margin:0, isTextBox:true });
-    });
-    const xt = x0 + 3*(boxW+gap);
-    s.addShape('roundRect', { x:xt, y, w:boxW, h:boxH, fill:{color:soft}, line:{color:acc, width:1.25}, rectRadius:0.08 });
-    s.addText('TOTAL ' + (interno ? 'INTERNO' : 'EXTERNO') + '\n(3 linhas)', { x:xt+0.2, y:y+0.2, w:boxW-0.4, h:0.6, fontFace:PD.FONTE, fontSize:11, bold:true, color:acc, margin:0, isTextBox:true });
-    s.addText(String(totalInd), { x:xt+0.2, y:y+1.0, w:boxW-0.4, h:0.8, fontFace:PD.FONTE, fontSize:40, bold:true, color:acc, valign:'middle', margin:0, isTextBox:true });
-    s.addText(pdPct(d.total ? totalInd/d.total*100 : 0) + ' do total de NCs', { x:xt+0.2, y:y+1.95, w:boxW-0.4, h:0.3, fontFace:PD.FONTE, fontSize:10, color:acc, margin:0, isTextBox:true });
-  }
   function pdMotivosLado(pres, s, x0, titulo, motivos, cores, corTitulo, totalInd){
     s.addText(titulo, { x:x0, y:2.0, w:5.6, h:0.4, fontFace:PD.FONTE, fontSize:13, bold:true, color:corTitulo, margin:0, isTextBox:true });
     if(!motivos.length){
@@ -2350,8 +2329,6 @@
       const d = computeUnidade1Data();
       const rowsU1 = pdLinhasU1();
       pdSlideUnico(pres, 'UNIDADE 1', rowsU1, false);   // sem valor (R$) nesta área
-      pdKpiU1(pres, d, true);
-      pdKpiU1(pres, d, false);
       pdMotivosU1(pres, d);
       U1_SETORES.forEach(st => pdItensU1(pres, d, st));
       return 'ok';
