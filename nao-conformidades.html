@@ -2256,14 +2256,33 @@
   btnSlidesTables.addEventListener('click', generateTableSlides);
 
   // ---------------- Slides por Setor (UM slide por setor: top 3 itens + motivos de cada item) ----------------
+  // O setor é identificado SOMENTE pela coluna "C.C. Identifiou" (quem identificou o problema), comparando o
+  // NOME COMPLETO do setor — e não mais por quem cadastrou a NC. A coluna "C.C Origem do Problema" NÃO é usada aqui.
+  // Participam da reunião apenas estes 4 setores. "alvo" = nome do centro de custo como aparece no arquivo
+  // (o prefixo de código, como "LT - ", é ignorado pela comparação por "contém").
+  const SETORES_REUNIAO = [
+    { nome:'Tubular',      alvo:'Linha de Montagem Luminária Tubular' },
+    { nome:'Potência',     alvo:'Linha de Montagem Luminárias Potência' },
+    { nome:'Apoio 3',      alvo:'Metal Mecânica Apoio 03 Iluminação' },
+    { nome:'Almoxarifado', alvo:'Almoxarifado Iluminação' },
+  ];
+  // NCs do setor = as identificadas pelo setor (coluna "C.C. Identifiou")
+  function pdLinhasSetor(alvo){
+    const cols = state.cols || {}, rows = state.rawRows || [], t = keyOf(alvo);
+    if(!cols.identificou) return [];
+    return rows.filter(r => keyOf(r[cols.identificou]||'').includes(t));
+  }
   function generateSetorSlides(){
     return pdExecutar(btnSlidesSetor, 'Tabelas_NC_Setor.pptx', pres => {
-      if(!state.setorAgg){ alert('Não foi possível identificar a coluna "Cadastrado Por" no arquivo enviado, então não é possível gerar os slides por setor.'); return 'cancelado'; }
-      const nameCol = state.cols.cadastradoPor || state.cols.operador;
-      state.setorAgg.filter(s => s.setor !== 'Não mapeado').forEach(s => {
-        const rows = state.ncRows.filter(r => setorDeCadastro(r[nameCol]==null ? '' : r[nameCol].toString().trim()) === s.setor);
-        pdSlideUnico(pres, s.setor.toUpperCase(), rows, true);
+      const cols = state.cols || {};
+      if(!cols.identificou){ alert('Não foi possível identificar a coluna "C.C. Identifiou" (Setor que Identificou o Problema) no arquivo enviado — os slides por setor precisam dela.'); return 'cancelado'; }
+      const sem = [];
+      SETORES_REUNIAO.forEach(s => {
+        const rows = pdLinhasSetor(s.alvo);
+        if(!rows.length){ sem.push(s.nome); return; }
+        pdSlideUnico(pres, s.nome.toUpperCase(), rows, true);
       });
+      if(sem.length) showToast('Sem registros no arquivo para: ' + sem.join(', ') + '.');
       return 'ok';
     });
   }
