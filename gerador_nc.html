@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gerador de apresentação de NC</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#f4f1ea;--fg:#17202a;--mut:#6a6559;--card:#fff;--line:#ddd8cc;--acc:#e07a1f}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10161d;--fg:#f4f1ea;--mut:#a39e92;--card:#1b242d;--line:#2d3944}}
+:root[data-theme="dark"]{--bg:#10161d;--fg:#f4f1ea;--mut:#a39e92;--card:#1b242d;--line:#2d3944}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:'Helvetica Neue',Arial,sans-serif}
+main{max-width:1100px;margin:0 auto;padding:20px 16px 40px;display:flex;flex-direction:column;gap:16px}
+h1{font-size:22px;margin:0}
+.drop{display:flex;flex-direction:column;align-items:center;gap:6px;padding:24px;border:2px dashed var(--line);border-radius:14px;background:var(--card);cursor:pointer;text-align:center}
+.drop.over{border-color:var(--acc)}
+.drop b{font-size:16px}.drop span{font-size:14px;color:var(--mut)}
+.drop input{display:none}
+.msg{font-size:14px;color:var(--mut)}.msg.err{color:#c0392b}
+.panel{display:none;flex-wrap:wrap;gap:12px;align-items:flex-end;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+.panel label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--mut);flex:1 1 180px}
+.panel input,.panel select{font:inherit;font-size:15px;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);width:100%}
+button{font:inherit;font-size:15px;padding:9px 16px;border:0;border-radius:8px;background:var(--acc);color:#17202a;font-weight:600;cursor:pointer}
+#stage{width:100%;position:relative;overflow:hidden;border-radius:12px;border:1px solid var(--line);display:none}
+#slide{width:1920px;height:1080px;position:absolute;left:0;top:0;transform-origin:0 0;background:#f4f1ea;font-family:'Helvetica Neue',Arial,sans-serif}
+@page{size:1920px 1080px;margin:0}
+@media print{:root{padding:0}main{max-width:none;padding:0}h1,.drop,.msg,.panel{display:none!important}#stage{width:1920px!important;height:1080px!important;border:0;border-radius:0}#slide{transform:none!important}}
+</style></head><body>
+<main>
+<h1>Gerador de apresentação – Não conformidades</h1>
+<label class="drop" id="drop"><b>Carregar arquivo DataGrid</b><span>Clique ou arraste o .xlsx / .xls / .csv aqui</span><input type="file" id="file" accept=".xlsx,.xls,.csv"></label>
+<div class="msg" id="msg">Nenhum arquivo carregado.</div>
+<div class="panel" id="panel">
+<label>Critério do item crítico<select id="crit"><option value="qty">Maior quantidade com NC</option><option value="val">Maior valor total (R$)</option></select></label>
+<label>Origem (título)<input id="fOrigin"></label>
+<label>Quantidade<input id="fQty" inputmode="decimal"></label>
+<label>Valor unitário (R$)<input id="fPrice" inputmode="decimal"></label>
+<button class="exp" id="bPdf">Baixar PDF</button><button class="exp" id="bPpt">Baixar PPT</button>
+</div>
+<div id="stage"><div id="slide"></div></div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const norm=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+const nf=(v,d)=>v.toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d===0?3:d});
+const money=v=>'R$ '+nf(v,2);
+function num(v){if(typeof v==='number')return v;let s=String(v??'').replace(/[R$\s]/g,'');if(!s)return NaN;
+ if(s.includes(',')&&s.includes('.'))s=s.replace(/\./g,'').replace(',','.');else if(s.includes(','))s=s.replace(',','.');else if(/^\d{1,3}(\.\d{3})+$/.test(s))s=s.replace(/\./g,'');
+ return /^-?\d*\.?\d+$/.test(s)?parseFloat(s):NaN}
+function toDate(v){if(v instanceof Date&&!isNaN(v)){const d=new Date(v.getTime()+43200000);return Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate())}
+ const m=/^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(v).trim());return m?Date.UTC(+m[3],m[2]-1,+m[1]):null}
+const fmtDate=t=>{const d=new Date(t),p=n=>String(n).padStart(2,'0');return p(d.getUTCDate())+'/'+p(d.getUTCMonth()+1)+'/'+d.getUTCFullYear()};
+const cap=s=>{s=String(s||'').trim();return s?s[0].toUpperCase()+s.slice(1):''};
+function nice(s){s=String(s||'').trim();if(s===s.toUpperCase()&&/[A-ZÀ-Ý]/.test(s))s=s.toLowerCase().replace(/(^|[\s(\-–])([a-zà-ÿ])/g,(m,a,b)=>a+b.toUpperCase()).replace(/ (De|Da|Do|Das|Dos|E) /g,m=>m.toLowerCase());return s.replace(/\s[-–—]\s/g,' – ')}
+function fmtQS(s){s=String(s||'').trim();if(s.split('(').length>s.split(')').length)s=s.slice(0,s.lastIndexOf('(')).trim();const m=/^(Q\s*\d+)\s*[-–—:]\s*(.*)$/i.exec(s);
+ if(m){let r=m[2];if(r===r.toUpperCase())r=r.toLowerCase();return m[1].replace(/\s/g,'').toUpperCase()+' – '+cap(r)}
+ return cap(s===s.toUpperCase()?s.toLowerCase():s)||'Sem motivo informado'}
+function parseRows(rows){
+ let h=-1;for(let i=0;i<Math.min(rows.length,15);i++){const n=rows[i].map(norm);if(n.includes('produto')||n.some(x=>x.startsWith('cod prod'))){h=i;break}}
+ const out=[];
+ if(h>=0){const n=rows[h].map(norm),f=fn=>n.findIndex(fn);
+  const ix={code:f(x=>x.startsWith('cod')&&x.includes('prod')),prod:f(x=>x==='produto'||x.startsWith('descricao')),qty:f(x=>/^(qtde|qtd|quantidade)\b/.test(x)),
+   price:f(x=>/(valor unit|vl unit|preco)/.test(x)),qs:f(x=>x==='q s'||x==='qs'),date:f(x=>x.startsWith('data')&&/\bn c\b|\bnc\b/.test(x)),origin:f(x=>x.includes('origem')),
+   obs:f(x=>x.startsWith('observ')),unit:f(x=>/^(un|und|unid|unidade|u m|um)$/.test(x))};
+  if(ix.date<0)ix.date=f(x=>x.startsWith('data'));
+  const g=k=>ix[k]>=0?k:null;
+  for(const r of rows.slice(h+1)){let code=String(r[ix.code]??'').trim();if(!code)continue;if(/^\d{8,9}$/.test(code))code=code.padStart(10,'0');
+   out.push({code,prod:String(r[ix.prod]??'').trim(),qty:num(r[ix.qty])||0,price:num(r[ix.price])||0,qs:ix.qs>=0?String(r[ix.qs]).trim():'',
+    date:ix.date>=0?toDate(r[ix.date]):null,origin:ix.origin>=0?String(r[ix.origin]).trim():'',obs:ix.obs>=0?String(r[ix.obs]).trim():'',unit:ix.unit>=0?String(r[ix.unit]).trim():''})}
+ }else{
+  for(const r of rows){const s=r.map(c=>String(c??'').trim());const ci=s.findIndex(c=>/^\d{9,10}$/.test(c));if(ci<0)continue;
+   const ui=s.findIndex(c=>/^(MT|UN|UND|PC|PCS|PÇ|KG|M|CX|L|M2|JG|CJ|PAR)$/i.test(c)),qi=s.findIndex(c=>/^Q\s*\d+\s*[-–—]/i.test(c)),di=r.findIndex(c=>toDate(c)!==null);
+   let qty=0,price=0;
+   if(ui>0){qty=num(r[ui-1]);price=num(r[ui+1])}else{const ns=r.map((c,i)=>i<ci&&i!==di&&(typeof c==='number'||/^[\d.,]+$/.test(s[i]))?num(c):NaN).filter(x=>!isNaN(x));qty=ns[0];price=ns[1]}
+   let obs='';if(qi>=0)for(let i=s.length-1;i>qi;i--)if(s[i]&&isNaN(num(s[i]))){obs=s[i];break}
+   out.push({code:s[ci].padStart(10,'0'),prod:s[ci+1],qty:qty||0,price:price||0,qs:qi>=0?s[qi]:'',date:di>=0?toDate(r[di]):null,
+    origin:di>=0&&typeof r[di+1]==='string'?s[di+1]:'',obs,unit:ui>=0?s[ui]:''})}
+ }
+ return out.filter(r=>r.code&&r.prod)}
+let DATA=[],FILE='',S=null;
+function analyze(){
+ const m={};for(const r of DATA){const g=m[r.code]??=(r.k={code:r.code,prod:r.prod,qty:0,val:0,n:0,rows:[]},r.k);g.qty+=r.qty;g.val+=r.qty*r.price;g.n++;g.rows.push(r)}
+ const key=$('crit').value,list=Object.values(m).sort((a,b)=>b[key]-a[key]||b.n-a.n);
+ const it=list[0];if(!it){S=null;return}
+ const mode=a=>{const c={};a.filter(Boolean).forEach(x=>c[x]=(c[x]||0)+1);return Object.keys(c).sort((x,y)=>c[y]-c[x])[0]||''};
+ const rs={};for(const r of it.rows){const k=fmtQS(r.qs),g=rs[k]??={name:k,qty:0,val:0,obs:{}};g.qty+=r.qty;g.val+=r.qty*r.price;if(r.obs){const o=cap(r.obs);g.obs[o]=(g.obs[o]||0)+1}}
+ const dates=it.rows.map(r=>r.date).filter(x=>x!=null);
+ S={code:it.code,prod:it.prod,n:it.n,fileQty:it.qty,qty:it.qty,price:it.qty?it.val/it.qty:0,origin:nice(mode(it.rows.map(r=>r.origin))),unit:mode(it.rows.map(r=>r.unit)).toUpperCase(),
+  reasons:Object.values(rs).sort((a,b)=>b.qty-a.qty).slice(0,4),dmin:dates.length?Math.min(...dates):null,dmax:dates.length?Math.max(...dates):null};
+ $('fOrigin').value=S.origin;$('fQty').value=String(S.qty).replace('.',',');$('fPrice').value=String(+S.price.toFixed(4)).replace('.',',')}
+function model(){
+ const u=!S.unit||S.unit==='UN'||S.unit==='UND'?'un':S.unit,total=S.qty*S.price,sc=S.fileQty?S.qty/S.fileQty:1,multi=S.reasons.length>1;
+ const dt=S.dmin==null?'':' · NC de '+(S.dmin===S.dmax?fmtDate(S.dmin):fmtDate(S.dmin)+' a '+fmtDate(S.dmax));
+ const M=[],T=(x,y,w,h,s,size,bold,color,nw)=>M.push({t:'t',x,y,w,h,s,size,bold,color,nw}),R=(x,y,w,h,fill,line,r)=>M.push({t:'r',x,y,w,h,fill,line,r});
+ const title='Item com mais NC'+(S.origin?' · '+S.origin:'');
+ T(128,110,1664,80,title,title.length>44?52:64,1,'17202A');
+ T(128,215,1664,36,'Cód. '+S.code,28,0,'6A6559',1);
+ T(128,258,1664,110,S.prod,40,1,'17202A');
+ const cw=(1664-64)/3,ky=395,kh=170,vu=money(S.price)+(u==='un'?'':' / '+u);
+ [['Quantidade com NC',nf(S.qty,0)+' '+u,'17202A',null,'F4F1EA','C9C5BB',0],['Valor unitário',vu,'FFFFFF','DDD8CC','17202A','6A6559',0],['Valor total',money(total),'E07A1F',null,'17202A','17202A',1]].forEach((k,i)=>{
+  const x=128+i*(cw+32);R(x,ky,cw,kh,k[2],k[3],16);T(x+36,ky+28,cw-72,34,k[0],26,k[6],k[5],1);T(x+36,ky+84,cw-72,76,k[1],k[1].length>12?48:60,1,k[4],1)});
+ const n=S.reasons.length;
+ let ry=600,rowH=0;
+ S.reasons.forEach((r,i)=>{const full=n===1||(i===n-1&&n%2===1),w=full?1664:816,x=full?128:128+(i%2)*848;
+  if(i%2===0&&i>0){ry+=rowH+28;rowH=0}
+  const o=Object.keys(r.obs).sort((a,b)=>r.obs[b]-r.obs[a]).slice(0,2).join('; ').slice(0,110),tt=r.name+(multi?' · '+nf(r.qty*sc,0)+' '+u+' · '+money(r.val*sc):'');
+  const tl=Math.min(2,Math.ceil(tt.length/((w-36)/18.5))),sl=o?Math.min(2,Math.ceil(o.length/((w-36)/15.5))):0,th=tl*37,bh=4+th+(o?8+sl*34:0)+4;
+  R(x,ry,8,bh,i%2?'17202A':'E07A1F');
+  T(x+36,ry+4,w-36,th,tt,32,1,'17202A');
+  if(o)T(x+36,ry+4+th+8,w-36,sl*34,o,28,0,'4A463E');
+  rowH=Math.max(rowH,bh)});
+ T(128,990,1664,32,'Fonte: '+FILE+' · '+S.n+' registro'+(S.n>1?'s':'')+' · '+nf(S.qty,0)+' '+u+' × '+money(S.price),24,0,'6A6559',1);
+ return M}
+function render(){
+ if(!S)return;
+ const q=num($('fQty').value),p=num($('fPrice').value);S.qty=isNaN(q)?0:q;S.price=isNaN(p)?0:p;S.origin=$('fOrigin').value.trim();
+ $('slide').innerHTML=model().map(o=>o.t==='r'?`<div style="position:absolute;left:${o.x}px;top:${o.y}px;width:${o.w}px;height:${o.h}px;background:#${o.fill};${o.line?'border:1px solid #'+o.line+';':''}border-radius:${o.r||0}px"></div>`
+  :`<div style="position:absolute;left:${o.x}px;top:${o.y}px;width:${o.w}px;height:${o.h}px;font-size:${o.size}px;font-weight:${o.bold?700:400};color:#${o.color};line-height:1.15;overflow:hidden;${o.nw?'white-space:nowrap;':''}">${esc(o.s)}</div>`).join('');
+ $('stage').style.display='block';fit();
+ $('msg').className='msg';$('msg').textContent=S.fileQty>=1e6?'Atenção: a quantidade lida ('+nf(S.fileQty,0)+') parece muito alta. Se houver casas decimais, ajuste no campo "Quantidade".':FILE+' carregado: '+DATA.length+' registro(s).'}
+async function exportPPT(){const P=new PptxGenJS(),k=1/144;P.layout='LAYOUT_WIDE';const sl=P.addSlide();sl.background={color:'F4F1EA'};
+ for(const o of model()){
+  if(o.t==='r')sl.addShape(o.r?P.ShapeType.roundRect:P.ShapeType.rect,{x:o.x*k,y:o.y*k,w:o.w*k,h:o.h*k,fill:{color:o.fill},line:o.line?{color:o.line,width:1}:{type:'none'},rectRadius:o.r?0.12:undefined});
+  else sl.addText(o.s,{x:o.x*k,y:o.y*k,w:o.w*k,h:o.h*k,fontFace:'Arial',fontSize:o.size/2,bold:!!o.bold,color:o.color,valign:'top',margin:0,wrap:!o.nw})}
+ return P.write({outputType:'blob'})}
+function exportPDF(){const {jsPDF}=window.jspdf,d=new jsPDF({orientation:'landscape',unit:'px',format:[1920,1080],hotfixes:['px_scaling']}),rgb=x=>[0,2,4].map(i=>parseInt(x.substr(i,2),16));
+ d.setFillColor(...rgb('F4F1EA'));d.rect(0,0,1920,1080,'F');
+ for(const o of model()){
+  if(o.t==='r'){d.setFillColor(...rgb(o.fill));if(o.line){d.setDrawColor(...rgb(o.line));d.setLineWidth(1)}const st=o.line?'FD':'F';o.r?d.roundedRect(o.x,o.y,o.w,o.h,o.r,o.r,st):d.rect(o.x,o.y,o.w,o.h,st)}
+  else{d.setFont('helvetica',o.bold?'bold':'normal');d.setFontSize(o.size*0.75);d.setTextColor(...rgb(o.color));d.setLineHeightFactor(1.15);d.text(o.nw?[o.s]:d.splitTextToSize(o.s,o.w),o.x,o.y,{baseline:'top'})}}
+ return d.output('blob')}
+let DL=null;
+(async()=>{try{DL=await claude.use('downloads')}catch(e){}})();
+async function doExport(kind){if(!S)return;const m=$('msg');if(!DL){try{DL=await claude.use('downloads')}catch(e){}}
+ try{const blob=kind==='pdf'?exportPDF():await exportPPT();const fn='NC_'+S.code+(kind==='pdf'?'.pdf':'.pptx');if(DL){await DL.save({filename:fn,data:blob})}else{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}m.className='msg';m.textContent='Arquivo gerado.'}
+ catch(e){if(e&&e.code==='declined')return;m.className='msg err';m.textContent='Não foi possível exportar: '+((e&&e.message)||e)}}
+function fit(){const st=$('stage'),s=st.clientWidth/1920;$('slide').style.transform='scale('+s+')';st.style.height=(1080*s)+'px'}
+addEventListener('resize',fit);
+function load(f){if(!f)return;FILE=f.name;const fr=new FileReader();
+ fr.onload=e=>{try{const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});let best=[];
+  for(const n of wb.SheetNames){const rows=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:''});if(rows.length>best.length)best=rows}
+  DATA=parseRows(best);if(!DATA.length)throw new Error('Não encontrei produtos nesse arquivo. '+(best.length<2?'Ele tem só '+best.length+' linha'+(best[0]?' (colunas: '+best[0].filter(Boolean).join(', ')+')':'')+' e nenhum dado de produto. ':'')+'Exporte o DataGrid com as colunas Cód. Prod., Produto, Qtde., Valor Unitário e Q.S.');
+  $('panel').style.display='flex';analyze();render()}catch(err){$('msg').className='msg err';$('msg').textContent='Erro ao ler o arquivo: '+err.message}};
+ fr.readAsArrayBuffer(f)}
+$('file').onchange=e=>load(e.target.files[0]);
+const d=$('drop');['dragover','dragenter'].forEach(t=>d.addEventListener(t,e=>{e.preventDefault();d.classList.add('over')}));
+['dragleave','drop'].forEach(t=>d.addEventListener(t,e=>{e.preventDefault();d.classList.remove('over')}));
+d.addEventListener('drop',e=>load(e.dataTransfer.files[0]));
+$('crit').onchange=()=>{analyze();render()};
+['fOrigin','fQty','fPrice'].forEach(i=>$(i).oninput=render);
+$('bPdf').onclick=()=>doExport('pdf');$('bPpt').onclick=()=>doExport('ppt');
+</script></body></html>
