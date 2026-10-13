@@ -42,9 +42,27 @@ button{font-family:inherit;font-size:13px;padding:10px 16px;border:0;border-radi
 button:hover{background:var(--brand-deep)}
 #stage{width:100%;position:relative;overflow:hidden;border-radius:12px;border:1px solid var(--line);display:none}
 #slide{width:1920px;height:1080px;position:absolute;left:0;top:0;transform-origin:0 0;background:#f4f1ea;font-family:'Helvetica Neue',Arial,sans-serif}
+.ghost{background:transparent;color:var(--ink);border:1px solid var(--line-strong)}
+.ghost:hover{background:var(--paper)}
+.user{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--ink-muted)}
+.pending .shell{visibility:hidden}
+#boot{display:none;position:fixed;inset:0;align-items:center;justify-content:center;color:var(--ink-muted);font-size:14px}
+.pending #boot{display:flex}
+#loginScreen{display:none;position:fixed;inset:0;z-index:300;background:var(--paper);align-items:center;justify-content:center;padding:20px}
+.loginbox{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:26px 28px;max-width:360px;width:100%;display:flex;flex-direction:column;gap:14px}
+.loginbox h2{margin:0;font-size:16px}.loginbox p{margin:0;font-size:12.5px;color:var(--ink-muted)}
+.loginbox label{display:flex;flex-direction:column;gap:5px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-muted)}
+.loginbox input{font:inherit;font-size:14px;text-transform:none;letter-spacing:0;font-weight:400;padding:10px;border:1px solid var(--line-strong);border-radius:var(--radius-sm)}
+.loginbox input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+#loginError{font-size:12.5px;color:#B8471E}
 @page{size:1920px 1080px;margin:0}
 @media(max-width:820px){.shell{grid-template-columns:1fr}aside.sidebar{position:static;height:auto;flex-direction:row;align-items:center;padding:12px 16px;overflow-x:auto}.brandmark{border-bottom:none;padding:0 12px 0 0;margin:0;border-right:1px solid rgba(255,255,255,.14)}.sidebar .grow{display:none}.app-switcher{flex-direction:row;border-top:none;border-left:1px solid rgba(255,255,255,.14);margin:0 0 0 10px;padding:0 0 0 10px}.app-switcher-label{display:none}.app-switcher-link{white-space:nowrap}.topbar{padding:12px 16px}main{padding:18px 16px 40px}}
-</style></head><body>
+</style></head><body class="pending">
+<div id="boot">Conectando ao painel…</div>
+<div id="loginScreen"><form class="loginbox" id="formLogin"><h2>Gerador de Apresentação</h2><p>Entre com o mesmo e-mail e senha do painel de estoques.</p>
+<label>E-mail<input type="email" id="loginEmail" required autocomplete="username"></label>
+<label>Senha<input type="password" id="loginSenha" required autocomplete="current-password"></label>
+<button type="submit" id="btnLogin">Entrar</button><span id="loginError"></span></form></div>
 <div class="shell">
 <aside class="sidebar">
 <div class="brandmark"><span class="dot"></span><div class="names"><b>Estoques 023/014</b><span>Controle Operacional</span></div></div>
@@ -57,7 +75,7 @@ button:hover{background:var(--brand-deep)}
 </div>
 </aside>
 <div class="content">
-<div class="topbar"><div class="context"><span class="file">Gerador de Apresentação</span><span class="period" id="ctxHoje"></span></div></div>
+<div class="topbar"><div class="context"><span class="file">Gerador de Apresentação</span><span class="period" id="ctxHoje"></span></div><div class="user" id="userBox" style="display:none"><span id="userEmail"></span><button class="ghost" id="btnLogout" type="button">Sair</button></div></div>
 <main>
 <label class="drop" id="drop"><b>Carregar arquivo DataGrid</b><span>Clique ou arraste o .xlsx / .xls / .csv aqui</span><input type="file" id="file" accept=".xlsx,.xls,.csv"></label>
 <div class="msg" id="msg">Nenhum arquivo carregado.</div>
@@ -66,7 +84,7 @@ button:hover{background:var(--brand-deep)}
 <label>Origem (título)<input id="fOrigin"></label>
 <label>Quantidade<input id="fQty" inputmode="decimal"></label>
 <label>Valor unitário (R$)<input id="fPrice" inputmode="decimal"></label>
-<button class="exp" id="bPdf">Baixar PDF</button><button class="exp" id="bPpt">Baixar PPT</button>
+<button class="exp" id="bPdf">Baixar PDF</button><button class="exp" id="bPpt">Baixar PPT</button><div class="msg" id="priceNote" style="flex:1 1 100%"></div>
 </div>
 <div id="stage"><div id="slide"></div></div>
 </main>
@@ -114,7 +132,14 @@ function parseRows(rows){
     origin:di>=0&&typeof r[di+1]==='string'?s[di+1]:'',obs,unit:ui>=0?s[ui]:''})}
  }
  return out.filter(r=>r.code&&r.prod)}
-let DATA=[],FILE='',S=null;
+let DATA=[],FILE='',S=null,CAT={},CATSTATE='aguardando',CATMSG='';
+const codeKeys=c=>{c=String(c||'').trim().toLowerCase();return [c,c.replace(/^0+/,'')]};
+function applyCatalog(){let n=0,miss=0;for(const r of DATA){r.src='arquivo';if(r.priceFile>0){r.price=r.priceFile;continue}
+ const k=codeKeys(r.code),c=CAT[k[0]]||CAT[k[1]];if(c){r.price=c;r.src='painel';n++}else{r.price=0;r.src='nenhum';miss++}}return{n,miss}}
+window.setCatalogo=(map,state,msg)=>{CAT=map||{};CATSTATE=state;CATMSG=msg||'';if(DATA.length){applyCatalog();analyze();render()}};
+function priceNote(){if(!S)return;const t={arquivo:'Valor unitário lido do DataGrid.',painel:'Valor unitário vindo do painel de estoques (último valor registrado).',misto:'Valor unitário: parte do DataGrid, parte do painel de estoques.',parcial:'Alguns registros do item ficaram sem valor — confira o valor unitário.',nenhum:'Valor unitário não encontrado no DataGrid nem no painel — preencha no campo ao lado.'};
+ let s=S.manual?'Valor unitário digitado manualmente.':t[S.src];if(CATSTATE==='erro'&&S.src!=='arquivo'&&!S.manual)s+=' (Não foi possível ler os valores do painel: '+CATMSG+'.)';
+ if(CATSTATE==='aguardando'&&S.src!=='arquivo'&&!S.manual)s+=' Aguardando o painel responder…';$('priceNote').textContent=s}
 function analyze(){
  const m={};for(const r of DATA){const g=m[r.code]??=(r.k={code:r.code,prod:r.prod,qty:0,val:0,n:0,rows:[]},r.k);g.qty+=r.qty;g.val+=r.qty*r.price;g.n++;g.rows.push(r)}
  const key=$('crit').value,list=Object.values(m).sort((a,b)=>b[key]-a[key]||b.n-a.n);
@@ -124,6 +149,7 @@ function analyze(){
  const dates=it.rows.map(r=>r.date).filter(x=>x!=null);
  S={code:it.code,prod:it.prod,n:it.n,fileQty:it.qty,qty:it.qty,price:it.qty?it.val/it.qty:0,origin:nice(mode(it.rows.map(r=>r.origin))),unit:mode(it.rows.map(r=>r.unit)).toUpperCase(),
   reasons:Object.values(rs).sort((a,b)=>b.qty-a.qty).slice(0,4),dmin:dates.length?Math.min(...dates):null,dmax:dates.length?Math.max(...dates):null};
+ const ss=new Set(it.rows.map(r=>r.src));S.src=ss.has('nenhum')?(ss.size>1?'parcial':'nenhum'):(ss.has('painel')?(ss.has('arquivo')?'misto':'painel'):'arquivo');
  $('fOrigin').value=S.origin;$('fQty').value=String(S.qty).replace('.',',');$('fPrice').value=String(+S.price.toFixed(4)).replace('.',',')}
 function model(){
  const u=!S.unit||S.unit==='UN'||S.unit==='UND'?'un':S.unit,total=S.qty*S.price,sc=S.fileQty?S.qty/S.fileQty:1,multi=S.reasons.length>1;
@@ -150,7 +176,7 @@ function model(){
  return M}
 function render(){
  if(!S)return;
- const q=num($('fQty').value),p=num($('fPrice').value);S.qty=isNaN(q)?0:q;S.price=isNaN(p)?0:p;S.origin=$('fOrigin').value.trim();
+ const q=num($('fQty').value),p=num($('fPrice').value);S.qty=isNaN(q)?0:q;S.price=isNaN(p)?0:p;S.origin=$('fOrigin').value.trim();priceNote();
  $('slide').innerHTML=model().map(o=>o.t==='r'?`<div style="position:absolute;left:${o.x}px;top:${o.y}px;width:${o.w}px;height:${o.h}px;background:#${o.fill};${o.line?'border:1px solid #'+o.line+';':''}border-radius:${o.r||0}px"></div>`
   :`<div style="position:absolute;left:${o.x}px;top:${o.y}px;width:${o.w}px;height:${o.h}px;font-size:${o.size}px;font-weight:${o.bold?700:400};color:#${o.color};line-height:1.15;overflow:hidden;${o.nw?'white-space:nowrap;':''}">${esc(o.s)}</div>`).join('');
  $('stage').style.display='block';fit();
@@ -177,14 +203,41 @@ function load(f){if(!f)return;FILE=f.name;const fr=new FileReader();
  fr.onload=e=>{try{const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});let best=[];
   for(const n of wb.SheetNames){const rows=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:''});if(rows.length>best.length)best=rows}
   DATA=parseRows(best);if(!DATA.length)throw new Error('Não encontrei produtos nesse arquivo. '+(best.length<2?'Ele tem só '+best.length+' linha'+(best[0]?' (colunas: '+best[0].filter(Boolean).join(', ')+')':'')+' e nenhum dado de produto. ':'')+'Exporte o DataGrid com as colunas Cód. Prod., Produto, Qtde., Valor Unitário e Q.S.');
-  $('panel').style.display='flex';analyze();render()}catch(err){$('msg').className='msg err';$('msg').textContent='Erro ao ler o arquivo: '+err.message}};
+  $('panel').style.display='flex';DATA.forEach(r=>{r.priceFile=r.price});applyCatalog();analyze();render()}catch(err){$('msg').className='msg err';$('msg').textContent='Erro ao ler o arquivo: '+err.message}};
  fr.readAsArrayBuffer(f)}
 $('file').onchange=e=>load(e.target.files[0]);
 const d=$('drop');['dragover','dragenter'].forEach(t=>d.addEventListener(t,e=>{e.preventDefault();d.classList.add('over')}));
 ['dragleave','drop'].forEach(t=>d.addEventListener(t,e=>{e.preventDefault();d.classList.remove('over')}));
 d.addEventListener('drop',e=>load(e.dataTransfer.files[0]));
 $('crit').onchange=()=>{analyze();render()};
-['fOrigin','fQty','fPrice'].forEach(i=>$(i).oninput=render);
+['fOrigin','fQty'].forEach(i=>$(i).oninput=render);$('fPrice').oninput=()=>{if(S)S.manual=true;render()};
 $('bPdf').onclick=()=>doExport('pdf');$('bPpt').onclick=()=>doExport('ppt');
 </script>
-<script>document.getElementById("ctxHoje").textContent="Hoje: "+new Date().toLocaleDateString("pt-BR");</script></body></html>
+<script>setTimeout(()=>{if(!window.__authResolved){document.body.classList.remove("pending");window.setCatalogo({},"erro","sem conexão com o painel")}},6000);</script>
+<script>document.getElementById("ctxHoje").textContent="Hoje: "+new Date().toLocaleDateString("pt-BR");</script><script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+import {getFirestore,doc,getDoc} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+import {getAuth,signInWithEmailAndPassword,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+const app=initializeApp({apiKey:"AIzaSyCYR4MPZi8J16RhsmrWRwNngcHZfROU1NY",authDomain:"controle-de-depositos-599cd.firebaseapp.com",projectId:"controle-de-depositos-599cd",storageBucket:"controle-de-depositos-599cd.firebasestorage.app",messagingSenderId:"902783447919",appId:"1:902783447919:web:470275956bdcd5476c2e9a"});
+const db=getFirestore(app),auth=getAuth(app),COL='painel_estoques_023_014',$=id=>document.getElementById(id);
+async function loadCatalogo(){
+ try{
+  const keys=['retrabalho_registros_v1','nc023_registros_v1','retrabalho_itens_catalogo_v1'];
+  const res=await Promise.allSettled(keys.map(k=>getDoc(doc(db,COL,k))));
+  if(!res.some(r=>r.status==='fulfilled')){window.setCatalogo({},'erro',(res[0].reason&&res[0].reason.code)||'sem permissão ou conexão');return}
+  const list=i=>res[i].status==='fulfilled'&&res[i].value.exists()?(res[i].value.data().items||[]):[];
+  const best={};
+  const take=(code,p,open,d)=>{code=String(code||'').trim().toLowerCase();if(!code||!(p>0))return;const c=best[code];if(!c||open>c.open||(open===c.open&&d>c.d))best[code]={p,open,d}};
+  [list(0),list(1)].forEach(l=>l.forEach(r=>take(r.codigo,Number(r.valorUnitario),r.status==='aberto'?1:0,r.dataInicio||'')));
+  list(2).forEach(it=>take(it.codigo,Number(it.valorUnitario),-1,''));
+  const map={};for(const c in best){map[c]=best[c].p;map[c.replace(/^0+/,'')]=best[c].p}
+  window.setCatalogo(map,'ok');
+ }catch(e){window.setCatalogo({},'erro',e.code||e.message||'erro desconhecido')}}
+$('formLogin').addEventListener('submit',async e=>{e.preventDefault();const b=$('btnLogin'),er=$('loginError');er.textContent='';b.disabled=true;b.textContent='Entrando...';
+ try{await signInWithEmailAndPassword(auth,$('loginEmail').value.trim(),$('loginSenha').value)}catch(err){er.textContent='E-mail ou senha incorretos.'}finally{b.disabled=false;b.textContent='Entrar'}});
+$('btnLogout').addEventListener('click',()=>signOut(auth));
+onAuthStateChanged(auth,user=>{window.__authResolved=true;document.body.classList.remove('pending');
+ if(user){$('loginScreen').style.display='none';$('userBox').style.display='flex';$('userEmail').textContent=user.email;loadCatalogo()}
+ else{$('userBox').style.display='none';$('loginScreen').style.display='flex';window.setCatalogo({},'aguardando')}});
+</script>
+</body></html>
