@@ -80,6 +80,7 @@ button:hover{background:var(--brand-deep)}
 <label class="drop" id="drop"><b>Carregar arquivo DataGrid</b><span>Clique ou arraste o .xlsx / .xls / .csv aqui</span><input type="file" id="file" accept=".xlsx,.xls,.csv"></label>
 <div class="msg" id="msg">Nenhum arquivo carregado.</div>
 <div class="panel" id="panel">
+<label>Filtrar por origem<select id="fOrigSel"><option value="">Todas as origens</option></select></label>
 <label>Critério do item crítico<select id="crit"><option value="qty">Maior quantidade com NC</option><option value="val">Maior valor total (R$)</option></select></label>
 <label>Origem (título)<input id="fOrigin"></label>
 <label>Quantidade<input id="fQty" inputmode="decimal"></label>
@@ -116,7 +117,7 @@ function parseRows(rows){
  if(h>=0){const n=rows[h].map(norm),f=fn=>n.findIndex(fn);
   const ix={code:f(x=>x.startsWith('cod')&&x.includes('prod')),prod:f(x=>x==='produto'||x.startsWith('descricao')),qty:f(x=>/^(qtde|qtd|quantidade)\b/.test(x)),
    price:f(x=>/(valor unit|vl unit|preco)/.test(x)),qs:f(x=>x==='q s'||x==='qs'),date:f(x=>x.startsWith('data')&&/\bn c\b|\bnc\b/.test(x)),origin:f(x=>x.includes('origem')),
-   obs:f(x=>x.startsWith('observ')),unit:f(x=>/^(un|und|unid|unidade|u m|um)$/.test(x))};
+   obs:f(x=>x.startsWith('observ')),unit:f(x=>/^(un|und|unid|unidade|u m|um|medida)$/.test(x))};
   if(ix.date<0)ix.date=f(x=>x.startsWith('data'));
   const g=k=>ix[k]>=0?k:null;
   for(const r of rows.slice(h+1)){let code=String(r[ix.code]??'').trim();if(!code)continue;if(/^\d{8,9}$/.test(code))code=code.padStart(10,'0');
@@ -132,7 +133,7 @@ function parseRows(rows){
     origin:di>=0&&typeof r[di+1]==='string'?s[di+1]:'',obs,unit:ui>=0?s[ui]:''})}
  }
  return out.filter(r=>r.code&&r.prod)}
-let DATA=[],FILE='',S=null,CAT={},CATSTATE='aguardando',CATMSG='';
+let DATA=[],FILE='',S=null,CAT={},CATSTATE='aguardando',CATMSG='',ORIG='';
 const codeKeys=c=>{c=String(c||'').trim().toLowerCase();return [c,c.replace(/^0+/,'')]};
 function applyCatalog(){let n=0,miss=0;for(const r of DATA){r.src='arquivo';if(r.priceFile>0){r.price=r.priceFile;continue}
  const k=codeKeys(r.code),c=CAT[k[0]]||CAT[k[1]];if(c){r.price=c;r.src='painel';n++}else{r.price=0;r.src='nenhum';miss++}}return{n,miss}}
@@ -141,7 +142,7 @@ function priceNote(){if(!S)return;const t={arquivo:'Valor unitário lido do Data
  let s=S.manual?'Valor unitário digitado manualmente.':t[S.src];if(CATSTATE==='erro'&&S.src!=='arquivo'&&!S.manual)s+=' (Não foi possível ler os valores do painel: '+CATMSG+'.)';
  if(CATSTATE==='aguardando'&&S.src!=='arquivo'&&!S.manual)s+=' Aguardando o painel responder…';$('priceNote').textContent=s}
 function analyze(){
- const m={};for(const r of DATA){const g=m[r.code]??=(r.k={code:r.code,prod:r.prod,qty:0,val:0,n:0,rows:[]},r.k);g.qty+=r.qty;g.val+=r.qty*r.price;g.n++;g.rows.push(r)}
+ const m={};for(const r of DATA.filter(r=>!ORIG||r.origin===ORIG)){const g=m[r.code]??=(r.k={code:r.code,prod:r.prod,qty:0,val:0,n:0,rows:[]},r.k);g.qty+=r.qty;g.val+=r.qty*r.price;g.n++;g.rows.push(r)}
  const key=$('crit').value,list=Object.values(m).sort((a,b)=>b[key]-a[key]||b.n-a.n);
  const it=list[0];if(!it){S=null;return}
  const mode=a=>{const c={};a.filter(Boolean).forEach(x=>c[x]=(c[x]||0)+1);return Object.keys(c).sort((x,y)=>c[y]-c[x])[0]||''};
@@ -199,17 +200,23 @@ async function doExport(kind){if(!S)return;const m=$('msg');if(!DL){try{DL=await
  catch(e){if(e&&e.code==='declined')return;m.className='msg err';m.textContent='Não foi possível exportar: '+((e&&e.message)||e)}}
 function fit(){const st=$('stage'),s=st.clientWidth/1920;$('slide').style.transform='scale('+s+')';st.style.height=(1080*s)+'px'}
 addEventListener('resize',fit);
+// Alguns exports do Senior declaram a planilha como A1:C1 no cabeçalho do arquivo, mesmo com centenas de linhas.
+// O Excel ignora isso, mas a biblioteca de leitura não — então recalculamos o intervalo real pelas células existentes.
+function fixRef(ws){let r1=1e9,r2=-1,c1=1e9,c2=-1;for(const k in ws){if(k[0]==='!')continue;const a=XLSX.utils.decode_cell(k);if(a.r<r1)r1=a.r;if(a.r>r2)r2=a.r;if(a.c<c1)c1=a.c;if(a.c>c2)c2=a.c}
+ if(r2>=0)ws['!ref']=XLSX.utils.encode_range({s:{r:r1,c:c1},e:{r:r2,c:c2}});return ws}
+function fillOrigSel(){const c={};DATA.forEach(r=>{if(r.origin)c[r.origin]=(c[r.origin]||0)+1});const s=$('fOrigSel');
+ s.innerHTML='<option value="">Todas as origens</option>'+Object.keys(c).sort((a,b)=>c[b]-c[a]).map(o=>'<option value="'+esc(o)+'">'+esc(nice(o))+' ('+c[o]+')</option>').join('');s.value=ORIG}
 function load(f){if(!f)return;FILE=f.name;const fr=new FileReader();
  fr.onload=e=>{try{const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});let best=[];
-  for(const n of wb.SheetNames){const rows=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:''});if(rows.length>best.length)best=rows}
+  for(const n of wb.SheetNames){const rows=XLSX.utils.sheet_to_json(fixRef(wb.Sheets[n]),{header:1,raw:true,defval:''});if(rows.length>best.length)best=rows}
   DATA=parseRows(best);if(!DATA.length)throw new Error('Não encontrei produtos nesse arquivo. '+(best.length<2?'Ele tem só '+best.length+' linha'+(best[0]?' (colunas: '+best[0].filter(Boolean).join(', ')+')':'')+' e nenhum dado de produto. ':'')+'Exporte o DataGrid com as colunas Cód. Prod., Produto, Qtde., Valor Unitário e Q.S.');
-  $('panel').style.display='flex';DATA.forEach(r=>{r.priceFile=r.price});applyCatalog();analyze();render()}catch(err){$('msg').className='msg err';$('msg').textContent='Erro ao ler o arquivo: '+err.message}};
+  $('panel').style.display='flex';ORIG='';DATA.forEach(r=>{r.priceFile=r.price});fillOrigSel();applyCatalog();analyze();render()}catch(err){$('msg').className='msg err';$('msg').textContent='Erro ao ler o arquivo: '+err.message}};
  fr.readAsArrayBuffer(f)}
 $('file').onchange=e=>load(e.target.files[0]);
 const d=$('drop');['dragover','dragenter'].forEach(t=>d.addEventListener(t,e=>{e.preventDefault();d.classList.add('over')}));
 ['dragleave','drop'].forEach(t=>d.addEventListener(t,e=>{e.preventDefault();d.classList.remove('over')}));
 d.addEventListener('drop',e=>load(e.dataTransfer.files[0]));
-$('crit').onchange=()=>{analyze();render()};
+$('crit').onchange=()=>{analyze();render()};$('fOrigSel').onchange=e=>{ORIG=e.target.value;analyze();render()};
 ['fOrigin','fQty'].forEach(i=>$(i).oninput=render);$('fPrice').oninput=()=>{if(S)S.manual=true;render()};
 $('bPdf').onclick=()=>doExport('pdf');$('bPpt').onclick=()=>doExport('ppt');
 </script>
