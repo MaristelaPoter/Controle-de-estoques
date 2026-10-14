@@ -155,7 +155,7 @@ window.setValores=m=>{SAVED=m||{};if(DATA.length){applyCatalog();analyze();rende
 window.setCatalogo=(map,state,msg)=>{CAT=map||{};CATSTATE=state;CATMSG=msg||'';if(DATA.length){applyCatalog();analyze();render()}};
 function priceNote(){if(!S)return;
  const t={arquivo:'Valor unitário lido do DataGrid.',painel:'Valor unitário vindo do painel de estoques (último valor registrado).',
-  salvo:'Valor unitário salvo manualmente'+(S.saved&&S.saved.by?' por '+S.saved.by+' em '+fmtGerado(S.saved.at).split(' às ')[0]:'')+' — vale para este item em todos os relatórios. Para remover, apague o campo.',
+  salvo:'',
   misto:'Valor unitário: parte do DataGrid, parte do painel ou salvo.',parcial:'Alguns registros do item ficaram sem valor — confira o valor unitário.',nenhum:'Valor unitário não encontrado no DataGrid nem no painel — preencha no campo ao lado.'};
  let s=S.manual?(window.IS_ADMIN?'Valor unitário digitado — será salvo para este item ao sair do campo.':'Valor unitário digitado (vale só nesta tela; só a administradora salva valores).'):t[S.src];
  if(CATSTATE==='erro'&&(S.src==='nenhum'||S.src==='parcial')&&!S.manual)s+=' (Não foi possível ler os valores do painel: '+CATMSG+'.)';
