@@ -55,6 +55,17 @@ button:hover{background:var(--brand-deep)}
 .loginbox input{font:inherit;font-size:14px;text-transform:none;letter-spacing:0;font-weight:400;padding:10px;border:1px solid var(--line-strong);border-radius:var(--radius-sm)}
 .loginbox input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
 #loginError{font-size:12.5px;color:#B8471E}
+.histcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.histhead{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}.histhead h3{margin:0;font-size:15px}
+.histfilter{display:flex;gap:10px;flex-wrap:wrap}
+.histfilter input{font:inherit;font-size:13px;padding:8px 10px;border:1px solid var(--line-strong);border-radius:var(--radius-sm);flex:1 1 150px;min-width:0}
+.histwrap{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:10px}
+table.hist{width:100%;border-collapse:collapse;font-size:12.5px;min-width:560px}
+.hist th{position:sticky;top:0;background:var(--brand-soft);color:var(--brand-deep);text-align:left;padding:9px 12px;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px}
+.hist td{padding:8px 12px;border-top:1px solid var(--line)}.hist td.num{text-align:right;font-family:var(--mono)}
+.hist .act{display:flex;gap:6px}.btn-sm{padding:5px 12px;font-size:12px}.btn-ver{background:var(--ink)}.btn-ver:hover{background:#000}
+.btn-del{background:transparent;color:#B8471E;border:1px solid #F0D5CB}.btn-del:hover{background:#F7E9E2}
+.empty{padding:22px;text-align:center;color:var(--ink-muted);font-size:13px}
 @page{size:1920px 1080px;margin:0}
 @media(max-width:820px){.shell{grid-template-columns:1fr}aside.sidebar{position:static;height:auto;flex-direction:row;align-items:center;padding:12px 16px;overflow-x:auto}.brandmark{border-bottom:none;padding:0 12px 0 0;margin:0;border-right:1px solid rgba(255,255,255,.14)}.sidebar .grow{display:none}.app-switcher{flex-direction:row;border-top:none;border-left:1px solid rgba(255,255,255,.14);margin:0 0 0 10px;padding:0 0 0 10px}.app-switcher-label{display:none}.app-switcher-link{white-space:nowrap}.topbar{padding:12px 16px}main{padding:18px 16px 40px}}
 </style></head><body class="pending">
@@ -79,6 +90,9 @@ button:hover{background:var(--brand-deep)}
 <main>
 <label class="drop" id="drop"><b>Carregar arquivo DataGrid</b><span>Clique ou arraste o .xlsx / .xls / .csv aqui</span><input type="file" id="file" accept=".xlsx,.xls,.csv"></label>
 <div class="msg" id="msg">Nenhum arquivo carregado.</div>
+<div class="histcard" id="histCard"><div class="histhead"><h3>Histórico de Relatórios</h3><span class="msg" id="histNote">Os arquivos carregados ficam salvos aqui para abrir em qualquer computador.</span></div>
+<div class="histfilter"><input id="hKw" placeholder="Palavra-chave (arquivo, usuário)"><input type="date" id="hDe" title="Período a partir de"><input type="date" id="hAte" title="Período até"><button class="ghost" id="hClear" type="button">Limpar</button></div>
+<div class="histwrap" id="histWrap"><div class="empty">Carregando histórico…</div></div></div>
 <div class="panel" id="panel">
 <label>Filtrar por origem<select id="fOrigSel"><option value="">Todas as origens</option></select></label>
 <label>Critério do item crítico<select id="crit"><option value="qty">Maior quantidade com NC</option><option value="val">Maior valor total (R$)</option></select></label>
@@ -204,15 +218,39 @@ addEventListener('resize',fit);
 // O Excel ignora isso, mas a biblioteca de leitura não — então recalculamos o intervalo real pelas células existentes.
 function fixRef(ws){let r1=1e9,r2=-1,c1=1e9,c2=-1;for(const k in ws){if(k[0]==='!')continue;const a=XLSX.utils.decode_cell(k);if(a.r<r1)r1=a.r;if(a.r>r2)r2=a.r;if(a.c<c1)c1=a.c;if(a.c>c2)c2=a.c}
  if(r2>=0)ws['!ref']=XLSX.utils.encode_range({s:{r:r1,c:c1},e:{r:r2,c:c2}});return ws}
+let HIST=[],HERR='';
+const fmtGerado=iso=>{const d=new Date(iso);return d.toLocaleDateString('pt-BR')+' às '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})};
+window.refreshHist=async()=>{if(!window.Hist)return;try{HIST=await Hist.list();HERR=''}catch(e){HIST=[];HERR=e.code||e.message||'erro'}renderHist()};
+function renderHist(){const w=$('histWrap');
+ if(HERR){w.innerHTML='<div class="empty">Não foi possível ler o histórico ('+esc(HERR)+').</div>';return}
+ const kw=normK($('hKw').value),de=$('hDe').value?Date.parse($('hDe').value+'T00:00:00Z'):null,ate=$('hAte').value?Date.parse($('hAte').value+'T00:00:00Z'):null;
+ const l=HIST.filter(e=>(!kw||normK(e.arquivo+' '+e.usuario+' '+e.periodo).includes(kw))&&(de==null||e.ate==null||e.ate>=de)&&(ate==null||e.de==null||e.de<=ate));
+ if(!l.length){w.innerHTML='<div class="empty">'+(HIST.length?'Nenhum relatório encontrado com esses filtros.':'Nenhum relatório salvo ainda. Carregue um DataGrid para começar.')+'</div>';return}
+ w.innerHTML='<table class="hist"><thead><tr><th>Gerado em</th><th>Período</th><th>Arquivo</th><th class="num">Registros</th><th>Usuário</th><th>Ações</th></tr></thead><tbody>'+l.map(e=>'<tr><td>'+esc(fmtGerado(e.geradoEm))+'</td><td>'+esc(e.periodo)+'</td><td>'+esc(e.arquivo)+'</td><td class="num">'+e.registros+'</td><td>'+esc(e.usuario||'Não informado')+'</td><td class="act"><button class="btn-sm btn-ver" data-ver="'+e.id+'">Ver</button>'+(window.IS_ADMIN?'<button class="btn-sm btn-del" data-del="'+e.id+'">Excluir</button>':'')+'</td></tr>').join('')+'</tbody></table>'}
+const normK=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+async function saveHist(){const n=$('histNote');if(!window.Hist)return;
+ if(!window.IS_ADMIN){n.textContent='Somente a administradora salva no histórico.';return}
+ const ds=DATA.map(r=>r.date).filter(x=>x!=null),de=ds.length?Math.min(...ds):null,ate=ds.length?Math.max(...ds):null,q=Math.round(DATA.reduce((s,r)=>s+r.qty,0)*1000);
+ const meta={geradoEm:new Date().toISOString(),de,ate,periodo:de==null?'—':(de===ate?fmtDate(de):fmtDate(de)+' a '+fmtDate(ate)),arquivo:FILE,registros:DATA.length,usuario:window.USER_EMAIL||'',sig:DATA.length+'|'+de+'|'+ate+'|'+q};
+ const rows=DATA.map(r=>({code:r.code,prod:r.prod,qty:+r.qty||0,priceFile:+r.priceFile||0,qs:r.qs||'',date:r.date==null?null:r.date,origin:r.origin||'',obs:r.obs||'',unit:r.unit||''}));
+ n.textContent='Salvando no histórico…';
+ try{const res=await Hist.save(meta,rows);n.textContent=res==='dup'?'Este relatório já estava no histórico.':'Relatório salvo no histórico.';await refreshHist()}catch(e){n.textContent='Não foi possível salvar no histórico ('+(e.code||e.message)+').'}}
+async function viewHist(id){const e=HIST.find(x=>x.id===id);if(!e)return;const n=$('histNote');n.textContent='Abrindo…';
+ try{const rows=await Hist.load(id);DATA=rows.map(r=>({...r,price:r.priceFile}));FILE=e.arquivo;ORIG='';$('panel').style.display='flex';fillOrigSel();applyCatalog();analyze();render();n.textContent='Relatório de '+e.periodo+' aberto.';$('stage').scrollIntoView({behavior:'smooth',block:'start'})}
+ catch(err){n.textContent='Não foi possível abrir o relatório ('+(err.code||err.message)+').'}}
+async function delHist(id){if(!window.IS_ADMIN)return;if(!confirm('Excluir este relatório do histórico?'))return;try{await Hist.remove(id);$('histNote').textContent='Relatório excluído.';await refreshHist()}catch(e){$('histNote').textContent='Não foi possível excluir ('+(e.code||e.message)+').'}}
+$('histWrap').addEventListener('click',e=>{const v=e.target.closest('[data-ver]'),d=e.target.closest('[data-del]');if(v)viewHist(v.dataset.ver);else if(d)delHist(d.dataset.del)});
+['hKw','hDe','hAte'].forEach(i=>$(i).addEventListener('input',renderHist));
+$('hClear').addEventListener('click',()=>{$('hKw').value='';$('hDe').value='';$('hAte').value='';renderHist()});
 function fillOrigSel(){const c={};DATA.forEach(r=>{if(r.origin)c[r.origin]=(c[r.origin]||0)+1});const s=$('fOrigSel');
  s.innerHTML='<option value="">Todas as origens</option>'+Object.keys(c).sort((a,b)=>c[b]-c[a]).map(o=>'<option value="'+esc(o)+'">'+esc(nice(o))+' ('+c[o]+')</option>').join('');s.value=ORIG}
 function load(f){if(!f)return;FILE=f.name;const fr=new FileReader();
  fr.onload=e=>{try{const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});let best=[];
   for(const n of wb.SheetNames){const rows=XLSX.utils.sheet_to_json(fixRef(wb.Sheets[n]),{header:1,raw:true,defval:''});if(rows.length>best.length)best=rows}
   DATA=parseRows(best);if(!DATA.length)throw new Error('Não encontrei produtos nesse arquivo. '+(best.length<2?'Ele tem só '+best.length+' linha'+(best[0]?' (colunas: '+best[0].filter(Boolean).join(', ')+')':'')+' e nenhum dado de produto. ':'')+'Exporte o DataGrid com as colunas Cód. Prod., Produto, Qtde., Valor Unitário e Q.S.');
-  $('panel').style.display='flex';ORIG='';DATA.forEach(r=>{r.priceFile=r.price});fillOrigSel();applyCatalog();analyze();render()}catch(err){$('msg').className='msg err';$('msg').textContent='Erro ao ler o arquivo: '+err.message}};
+  $('panel').style.display='flex';ORIG='';DATA.forEach(r=>{r.priceFile=r.price});fillOrigSel();applyCatalog();analyze();render();saveHist()}catch(err){$('msg').className='msg err';$('msg').textContent='Erro ao ler o arquivo: '+err.message}};
  fr.readAsArrayBuffer(f)}
-$('file').onchange=e=>load(e.target.files[0]);
+$('file').onchange=e=>{const f=e.target.files[0];e.target.value='';load(f)};
 const d=$('drop');['dragover','dragenter'].forEach(t=>d.addEventListener(t,e=>{e.preventDefault();d.classList.add('over')}));
 ['dragleave','drop'].forEach(t=>d.addEventListener(t,e=>{e.preventDefault();d.classList.remove('over')}));
 d.addEventListener('drop',e=>load(e.dataTransfer.files[0]));
@@ -223,10 +261,20 @@ $('bPdf').onclick=()=>doExport('pdf');$('bPpt').onclick=()=>doExport('ppt');
 <script>setTimeout(()=>{if(!window.__authResolved){document.body.classList.remove("pending");window.setCatalogo({},"erro","sem conexão com o painel")}},6000);</script>
 <script>document.getElementById("ctxHoje").textContent="Hoje: "+new Date().toLocaleDateString("pt-BR");</script><script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-import {getFirestore,doc,getDoc} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+import {getFirestore,doc,getDoc,setDoc,deleteDoc,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 import {getAuth,signInWithEmailAndPassword,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 const app=initializeApp({apiKey:"AIzaSyCYR4MPZi8J16RhsmrWRwNngcHZfROU1NY",authDomain:"controle-de-depositos-599cd.firebaseapp.com",projectId:"controle-de-depositos-599cd",storageBucket:"controle-de-depositos-599cd.firebasestorage.app",messagingSenderId:"902783447919",appId:"1:902783447919:web:470275956bdcd5476c2e9a"});
 const db=getFirestore(app),auth=getAuth(app),COL='painel_estoques_023_014',$=id=>document.getElementById(id);
+const ADMIN_EMAIL='potermaristela@gmail.com',IDX='gerador_nc_historico_v1',REP=id=>'gerador_nc_rep_'+id;
+const Hist=window.Hist={
+ async list(){const s=await getDoc(doc(db,COL,IDX));return s.exists()?(s.data().items||[]):[]},
+ async save(meta,rows){if(JSON.stringify(rows).length>900000)throw new Error('arquivo grande demais para o histórico');
+  const list=await this.list();if(list.some(x=>x.sig===meta.sig))return 'dup';
+  const id=Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  await setDoc(doc(db,COL,REP(id)),{items:rows,updatedAt:serverTimestamp()});
+  await setDoc(doc(db,COL,IDX),{items:[{id,...meta},...list],updatedAt:serverTimestamp()});return 'saved'},
+ async load(id){const s=await getDoc(doc(db,COL,REP(id)));if(!s.exists())throw new Error('relatório não encontrado');return s.data().items||[]},
+ async remove(id){const list=(await this.list()).filter(x=>x.id!==id);await setDoc(doc(db,COL,IDX),{items:list,updatedAt:serverTimestamp()});await deleteDoc(doc(db,COL,REP(id)))}};
 async function loadCatalogo(){
  try{
   const keys=['retrabalho_registros_v1','nc023_registros_v1','retrabalho_itens_catalogo_v1'];
@@ -244,7 +292,7 @@ $('formLogin').addEventListener('submit',async e=>{e.preventDefault();const b=$(
  try{await signInWithEmailAndPassword(auth,$('loginEmail').value.trim(),$('loginSenha').value)}catch(err){er.textContent='E-mail ou senha incorretos.'}finally{b.disabled=false;b.textContent='Entrar'}});
 $('btnLogout').addEventListener('click',()=>signOut(auth));
 onAuthStateChanged(auth,user=>{window.__authResolved=true;document.body.classList.remove('pending');
- if(user){$('loginScreen').style.display='none';$('userBox').style.display='flex';$('userEmail').textContent=user.email;loadCatalogo()}
+ if(user){$('loginScreen').style.display='none';$('userBox').style.display='flex';$('userEmail').textContent=user.email;window.IS_ADMIN=(user.email===ADMIN_EMAIL);window.USER_EMAIL=user.email;loadCatalogo();window.refreshHist()}
  else{$('userBox').style.display='none';$('loginScreen').style.display='flex';window.setCatalogo({},'aguardando')}});
 </script>
 </body></html>
