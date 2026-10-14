@@ -147,14 +147,20 @@ function parseRows(rows){
     origin:di>=0&&typeof r[di+1]==='string'?s[di+1]:'',obs,unit:ui>=0?s[ui]:''})}
  }
  return out.filter(r=>r.code&&r.prod)}
-let DATA=[],FILE='',S=null,CAT={},CATSTATE='aguardando',CATMSG='',ORIG='';
+let DATA=[],FILE='',S=null,CAT={},CATSTATE='aguardando',CATMSG='',ORIG='',SAVED={};
 const codeKeys=c=>{c=String(c||'').trim().toLowerCase();return [c,c.replace(/^0+/,'')]};
-function applyCatalog(){let n=0,miss=0;for(const r of DATA){r.src='arquivo';if(r.priceFile>0){r.price=r.priceFile;continue}
+function applyCatalog(){let n=0,miss=0;for(const r of DATA){r.src='arquivo';{const kk=codeKeys(r.code),sv=SAVED[kk[0]]||SAVED[kk[1]];if(sv&&sv.price>0){r.price=sv.price;r.src='salvo';continue}}if(r.priceFile>0){r.price=r.priceFile;continue}
  const k=codeKeys(r.code),c=CAT[k[0]]||CAT[k[1]];if(c){r.price=c;r.src='painel';n++}else{r.price=0;r.src='nenhum';miss++}}return{n,miss}}
+window.setValores=m=>{SAVED=m||{};if(DATA.length){applyCatalog();analyze();render()}};
 window.setCatalogo=(map,state,msg)=>{CAT=map||{};CATSTATE=state;CATMSG=msg||'';if(DATA.length){applyCatalog();analyze();render()}};
-function priceNote(){if(!S)return;const t={arquivo:'Valor unitário lido do DataGrid.',painel:'Valor unitário vindo do painel de estoques (último valor registrado).',misto:'Valor unitário: parte do DataGrid, parte do painel de estoques.',parcial:'Alguns registros do item ficaram sem valor — confira o valor unitário.',nenhum:'Valor unitário não encontrado no DataGrid nem no painel — preencha no campo ao lado.'};
- let s=S.manual?'Valor unitário digitado manualmente.':t[S.src];if(CATSTATE==='erro'&&S.src!=='arquivo'&&!S.manual)s+=' (Não foi possível ler os valores do painel: '+CATMSG+'.)';
- if(CATSTATE==='aguardando'&&S.src!=='arquivo'&&!S.manual)s+=' Aguardando o painel responder…';$('priceNote').textContent=s}
+function priceNote(){if(!S)return;
+ const t={arquivo:'Valor unitário lido do DataGrid.',painel:'Valor unitário vindo do painel de estoques (último valor registrado).',
+  salvo:'Valor unitário salvo manualmente'+(S.saved&&S.saved.by?' por '+S.saved.by+' em '+fmtGerado(S.saved.at).split(' às ')[0]:'')+' — vale para este item em todos os relatórios. Para remover, apague o campo.',
+  misto:'Valor unitário: parte do DataGrid, parte do painel ou salvo.',parcial:'Alguns registros do item ficaram sem valor — confira o valor unitário.',nenhum:'Valor unitário não encontrado no DataGrid nem no painel — preencha no campo ao lado.'};
+ let s=S.manual?(window.IS_ADMIN?'Valor unitário digitado — será salvo para este item ao sair do campo.':'Valor unitário digitado (vale só nesta tela; só a administradora salva valores).'):t[S.src];
+ if(CATSTATE==='erro'&&(S.src==='nenhum'||S.src==='parcial')&&!S.manual)s+=' (Não foi possível ler os valores do painel: '+CATMSG+'.)';
+ if(CATSTATE==='aguardando'&&S.src==='nenhum'&&!S.manual)s+=' Aguardando o painel responder…';
+ if(S.extra)s+=' '+S.extra;$('priceNote').textContent=s}
 function analyze(){
  const m={};for(const r of DATA.filter(r=>!ORIG||r.origin===ORIG)){const g=m[r.code]??=(r.k={code:r.code,prod:r.prod,qty:0,val:0,n:0,rows:[]},r.k);g.qty+=r.qty;g.val+=r.qty*r.price;g.n++;g.rows.push(r)}
  const key=$('crit').value,list=Object.values(m).sort((a,b)=>b[key]-a[key]||b.n-a.n);
@@ -164,7 +170,7 @@ function analyze(){
  const dates=it.rows.map(r=>r.date).filter(x=>x!=null);
  S={code:it.code,prod:it.prod,n:it.n,fileQty:it.qty,qty:it.qty,price:it.qty?it.val/it.qty:0,origin:nice(mode(it.rows.map(r=>r.origin))),unit:mode(it.rows.map(r=>r.unit)).toUpperCase(),
   reasons:Object.values(rs).sort((a,b)=>b.qty-a.qty).slice(0,4),dmin:dates.length?Math.min(...dates):null,dmax:dates.length?Math.max(...dates):null};
- const ss=new Set(it.rows.map(r=>r.src));S.src=ss.has('nenhum')?(ss.size>1?'parcial':'nenhum'):(ss.has('painel')?(ss.has('arquivo')?'misto':'painel'):'arquivo');
+ const ss=[...new Set(it.rows.map(r=>r.src))];S.src=ss.length===1?ss[0]:(ss.includes('nenhum')?'parcial':'misto');S.saved=SAVED[codeKeys(it.code)[0]]||null;
  $('fOrigin').value=S.origin;$('fQty').value=String(S.qty).replace('.',',');$('fPrice').value=String(+S.price.toFixed(4)).replace('.',',')}
 function model(){
  const u=!S.unit||S.unit==='UN'||S.unit==='UND'?'un':S.unit,total=S.qty*S.price,sc=S.fileQty?S.qty/S.fileQty:1,multi=S.reasons.length>1;
@@ -256,6 +262,9 @@ const d=$('drop');['dragover','dragenter'].forEach(t=>d.addEventListener(t,e=>{e
 d.addEventListener('drop',e=>load(e.dataTransfer.files[0]));
 $('crit').onchange=()=>{analyze();render()};$('fOrigSel').onchange=e=>{ORIG=e.target.value;analyze();render()};
 ['fOrigin','fQty'].forEach(i=>$(i).oninput=render);$('fPrice').oninput=()=>{if(S)S.manual=true;render()};
+$('fPrice').onchange=async()=>{if(!S||!S.manual||!window.IS_ADMIN||!window.Vals)return;const code=S.code,key=codeKeys(code)[0],p=num($('fPrice').value),qv=$('fQty').value,ov=$('fOrigin').value;
+ try{SAVED=await Vals.set(key,isNaN(p)||p<=0?0:p,window.USER_EMAIL);applyCatalog();analyze();$('fQty').value=qv;$('fOrigin').value=ov;S.extra=(isNaN(p)||p<=0)?'Valor salvo removido para o item '+code+'.':'Valor salvo para o item '+code+'.';render()}
+ catch(e){S.extra='Não foi possível salvar o valor ('+(e.code||e.message)+').';render()}};
 $('bPdf').onclick=()=>doExport('pdf');$('bPpt').onclick=()=>doExport('ppt');
 </script>
 <script>setTimeout(()=>{if(!window.__authResolved){document.body.classList.remove("pending");window.setCatalogo({},"erro","sem conexão com o painel")}},6000);</script>
@@ -266,6 +275,10 @@ import {getAuth,signInWithEmailAndPassword,signOut,onAuthStateChanged} from "htt
 const app=initializeApp({apiKey:"AIzaSyCYR4MPZi8J16RhsmrWRwNngcHZfROU1NY",authDomain:"controle-de-depositos-599cd.firebaseapp.com",projectId:"controle-de-depositos-599cd",storageBucket:"controle-de-depositos-599cd.firebasestorage.app",messagingSenderId:"902783447919",appId:"1:902783447919:web:470275956bdcd5476c2e9a"});
 const db=getFirestore(app),auth=getAuth(app),COL='painel_estoques_023_014',$=id=>document.getElementById(id);
 const ADMIN_EMAIL='potermaristela@gmail.com',IDX='gerador_nc_historico_v1',REP=id=>'gerador_nc_rep_'+id;
+const VAL='gerador_nc_valores_v1';
+window.Vals={async get(){const s=await getDoc(doc(db,COL,VAL));return s.exists()?(s.data().items||{}):{}},
+ async set(code,price,by){const cur=await this.get();if(price>0)cur[code]={price,by,at:new Date().toISOString()};else delete cur[code];await setDoc(doc(db,COL,VAL),{items:cur,updatedAt:serverTimestamp()});return cur}};
+async function loadValores(){try{window.setValores(await window.Vals.get())}catch(e){window.setValores({})}}
 const Hist=window.Hist={
  async list(){const s=await getDoc(doc(db,COL,IDX));return s.exists()?(s.data().items||[]):[]},
  async save(meta,rows){if(JSON.stringify(rows).length>900000)throw new Error('arquivo grande demais para o histórico');
@@ -292,7 +305,7 @@ $('formLogin').addEventListener('submit',async e=>{e.preventDefault();const b=$(
  try{await signInWithEmailAndPassword(auth,$('loginEmail').value.trim(),$('loginSenha').value)}catch(err){er.textContent='E-mail ou senha incorretos.'}finally{b.disabled=false;b.textContent='Entrar'}});
 $('btnLogout').addEventListener('click',()=>signOut(auth));
 onAuthStateChanged(auth,user=>{window.__authResolved=true;document.body.classList.remove('pending');
- if(user){$('loginScreen').style.display='none';$('userBox').style.display='flex';$('userEmail').textContent=user.email;window.IS_ADMIN=(user.email===ADMIN_EMAIL);window.USER_EMAIL=user.email;loadCatalogo();window.refreshHist()}
+ if(user){$('loginScreen').style.display='none';$('userBox').style.display='flex';$('userEmail').textContent=user.email;window.IS_ADMIN=(user.email===ADMIN_EMAIL);window.USER_EMAIL=user.email;loadCatalogo();loadValores();window.refreshHist()}
  else{$('userBox').style.display='none';$('loginScreen').style.display='flex';window.setCatalogo({},'aguardando')}});
 </script>
 </body></html>
