@@ -85,6 +85,27 @@
   .chart-card-head h4{ margin:0; font-size:13.5px; color:var(--ink); font-weight:700;}
   .chart-canvas-wrap{ position:relative; height:240px;}
 
+  /* ---- Evolução de NCs: filtro em lista com caixas de seleção (estilo Power BI) ---- */
+  .ncs-filter{ position:relative; margin-bottom:12px; max-width:340px;}
+  .ncs-filter-label{ display:block; font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-muted); font-weight:700; margin-bottom:4px;}
+  .ncs-filter-box{ width:100%; display:flex; align-items:center; justify-content:space-between; gap:8px; background:var(--surface); border:1px solid var(--line-strong); border-radius:3px; padding:6px 10px; font:inherit; font-size:12.5px; color:var(--ink); cursor:pointer; text-align:left;}
+  .ncs-filter-box:hover, .ncs-filter.open .ncs-filter-box{ border-color:var(--brand);}
+  .ncs-filter-box .txt{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .ncs-filter-box .chev{ width:12px; height:12px; flex:none; color:var(--ink-muted); transition:transform .15s;}
+  .ncs-filter.open .chev{ transform:rotate(180deg);}
+  .ncs-filter-panel{ display:none; position:absolute; z-index:30; left:0; top:100%; margin-top:2px; min-width:100%; width:max-content; max-width:min(440px, 88vw); background:var(--surface); border:1px solid var(--line-strong); box-shadow:var(--shadow-md);}
+  .ncs-filter.open .ncs-filter-panel{ display:block;}
+  .ncs-filter-search{ width:100%; box-sizing:border-box; border:0; border-bottom:1px solid var(--line); padding:8px 10px; font:inherit; font-size:12.5px; outline:none; background:var(--surface);}
+  .ncs-filter-list{ max-height:230px; overflow:auto; padding:4px 0;}
+  .ncs-filter-opt{ display:flex; align-items:center; gap:9px; padding:5px 10px; font-size:12.5px; color:var(--ink); cursor:pointer;}
+  .ncs-filter-opt:hover{ background:var(--paper);}
+  .ncs-filter-opt input{ appearance:none; -webkit-appearance:none; width:14px; height:14px; flex:none; margin:0; border:1px solid #6B6B6B; border-radius:1px; background:#fff; cursor:pointer;}
+  .ncs-filter-opt input:checked{ background:#2B2B2B; border-color:#2B2B2B;}
+  .ncs-filter-empty{ padding:8px 10px; font-size:12px; color:var(--ink-faint);}
+  .ncs-filter-foot{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:6px 10px; border-top:1px solid var(--line); font-size:11.5px; color:var(--ink-muted);}
+  .ncs-filter-foot .lnk{ background:none; border:0; padding:0; font:inherit; color:var(--brand); cursor:pointer; text-decoration:underline;}
+  .ncs-total{ font-size:11.5px; color:var(--ink-muted); white-space:nowrap;}
+
   .app-switcher{ border-top:1px solid rgba(255,255,255,.12); margin-top:10px; padding-top:10px; display:flex; flex-direction:column; gap:2px;}
   .app-switcher-label{ font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:#7FB99B; padding:4px 12px 7px; font-weight:700;}
   .app-switcher-link{ display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:var(--radius-sm); color:#A9CFBB; font-size:13px; font-weight:500; text-decoration:none; font-family:var(--sans); transition:background .12s ease, color .12s ease;}
@@ -438,6 +459,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
         Saldo Diário
       </button>
+      <button class="tab" data-view="ncs">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="3 17 9 11 13 15 21 7"></polyline><polyline points="15 7 21 7 21 13"></polyline></svg>
+        Evolução de NCs
+      </button>
       <button class="tab" data-view="cadastro">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
         Cadastros
@@ -693,6 +718,41 @@
         <div id="saldoFoldersArea"></div>
       </div>
 
+      <!-- ===================== EVOLUÇÃO DE NCs ===================== -->
+      <div class="view" id="view-ncs">
+        <h3 class="section-title">Evolução de NCs <span class="n" id="nNcs">0</span></h3>
+        <p class="section-desc">Quantidade de não conformidades registradas por dia. Cada DataGrid carregado é somado ao histórico — os dias anteriores são mantidos. Use os filtros para ver por setor ou por item (sem seleção, mostra todos).</p>
+        <div class="form-card admin-only" id="ncsUploadCard" style="max-width:none; margin-bottom:10px;">
+          <div class="dropzone" id="ncsDropzone">
+            <div class="dropzone-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4M12 4l-4 4M12 4l4 4"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+            </div>
+            <div class="dropzone-text">
+              <strong>Arraste o DataGrid do dia aqui</strong>
+              <span>ou clique para selecionar (.xlsx) — cada arquivo é somado ao histórico; NCs já carregadas (mesmo Id) não são contadas de novo</span>
+            </div>
+            <input type="file" id="fileNcsDatagrid" accept=".xlsx,.xls" multiple style="display:none;">
+            <button type="button" class="btn-primary" id="btnNcsDatagrid">Selecionar DataGrid .xlsx</button>
+          </div>
+          <p class="form-note" id="ncsUploadNote" style="margin:12px 0 0;"></p>
+          <button type="button" class="btn-danger" id="btnNcsLimpar" style="margin-top:10px;">Apagar todo o histórico</button>
+        </div>
+        <p class="form-note" id="ncsInfo" style="margin:0 0 4px;"></p>
+        <div class="empty-note" id="ncsVazio">Nenhum DataGrid carregado ainda. Assim que for carregado, os gráficos aparecem aqui.</div>
+        <div class="charts-grid" id="ncsGrid" style="display:none;">
+          <div class="chart-card">
+            <div class="chart-card-head"><h4>NCs por dia — por setor</h4><span class="ncs-total" id="ncsTotalSetor"></span></div>
+            <div class="ncs-filter" id="ncsFiltroSetor"></div>
+            <div class="chart-canvas-wrap"><canvas id="chartNcsSetor"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card-head"><h4>NCs por dia — por item</h4><span class="ncs-total" id="ncsTotalItem"></span></div>
+            <div class="ncs-filter" id="ncsFiltroItem"></div>
+            <div class="chart-canvas-wrap"><canvas id="chartNcsItem"></canvas></div>
+          </div>
+        </div>
+      </div>
+
       <!-- ===================== CADASTROS ===================== -->
       <div class="view" id="view-cadastro">
         <div class="cad-grid">
@@ -893,11 +953,13 @@
   const K_ATUAL_FORN = 'atualizacoes_fornecedor_v1';
   // Data/hora do último arquivo carregado (importação de estoque) — todos que abrirem a página enxergam
   const K_ULTIMA_IMPORT = 'ultima_importacao_estoque_v1';
+  // Histórico ACUMULADO de NCs (uma entrada por NC, identificada pelo Id) para a aba "Evolução de NCs" — todos os usuários enxergam
+  const K_NCS_DADOS = 'evolucao_ncs_acumulado_v2';
 
   const DEFAULT_SETORES = ['Apoio 2','Apoio 3','Extrusora','Ferramentaria','Injeção','Marcenaria','Montagem','Montagem Iluminação','Retrabalho','Tubular','Unidade 1'];
 
   // ================= Estado =================
-  const state = { registros: [], ncRegistros: [], atualFornecedor: {}, ultimaImportacao: null, itens: [], setores: [], editingId: null, editingNcId: null, editingItemCodigo: null, tipoAtual: 'retrabalho' };
+  const state = { registros: [], ncRegistros: [], atualFornecedor: {}, ultimaImportacao: null, ncsDados: null, itens: [], setores: [], editingId: null, editingNcId: null, editingItemCodigo: null, tipoAtual: 'retrabalho' };
 
   function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   // Preserva a posição de rolagem de uma tabela (div.table-wrap) que vai ser
@@ -1126,6 +1188,7 @@
     state.ncRegistros = (await Store.get(K_NC_REGISTROS)) || [];
     await carregarAtualFornecedor();
     state.ultimaImportacao = (await Store.get(K_ULTIMA_IMPORT)) || null;
+    state.ncsDados = (await Store.get(K_NCS_DADOS)) || null;
     state.itens = (await Store.get(K_ITENS)) || [];
     let setores = await Store.get(K_SETORES);
     if(!setores || !setores.length){ setores = DEFAULT_SETORES.slice(); await Store.set(K_SETORES, setores); }
@@ -1458,6 +1521,7 @@
     if(name === 'cadastro') renderCadastros();
     if(name === 'novo') renderChips();
     if(name === 'saldo') renderSaldoDiario();
+    if(name === 'ncs') renderNcsView();
   }
   document.getElementById('tabs').addEventListener('click', e=>{
     const btn = e.target.closest('button.tab');
@@ -1915,6 +1979,326 @@
       }
     });
   }
+  // =====================================================================
+  // EVOLUÇÃO DE NCs — gráficos diários a partir do DataGrid.
+  // O arquivo é enviado só pela administradora; o resumo fica salvo no banco e TODOS os usuários visualizam.
+  // =====================================================================
+  let chartNcsSetor = null, chartNcsItem = null;
+  const ncsSel = { setor: new Set(), item: new Set() };   // rótulos escolhidos em cada filtro (vazio = todos)
+  let ncsFiltroSetor = null, ncsFiltroItem = null;
+  const ncsKey = s => normalize(s).replace(/[^a-z0-9]/g, '');
+
+  // Data -> número aaaammdd (texto dd/mm/aaaa, aaaa-mm-dd, número de série do Excel ou Date). null se inválida.
+  function ncsDataParaInt(v){
+    if(v == null || v === '') return null;
+    let y, m, d;
+    if(v instanceof Date){ if(isNaN(v)) return null; y = v.getFullYear(); m = v.getMonth() + 1; d = v.getDate(); }
+    else if(typeof v === 'number'){
+      if(!(v > 20000 && v < 80000)) return null;
+      const pc = XLSX.SSF.parse_date_code(v); if(!pc) return null; y = pc.y; m = pc.m; d = pc.d;
+    } else {
+      const s = String(v).trim();
+      let t = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/);
+      if(t){ d = +t[1]; m = +t[2]; y = +t[3]; }
+      else { t = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(!t) return null; y = +t[1]; m = +t[2]; d = +t[3]; }
+    }
+    if(!(y >= 2000 && y <= 2100 && m >= 1 && m <= 12 && d >= 1 && d <= 31)) return null;
+    const chk = new Date(y, m - 1, d);
+    if(chk.getMonth() !== m - 1 || chk.getDate() !== d) return null;
+    return y * 10000 + m * 100 + d;
+  }
+  function ncsNumero(v){
+    if(typeof v === 'number') return isNaN(v) ? 0 : v;
+    const s = String(v == null ? '' : v).trim(); if(!s) return 0;
+    const n = s.indexOf(',') >= 0 ? parseFloat(s.replace(/\./g, '').replace(',', '.')) : parseFloat(s);
+    return isNaN(n) ? 0 : n;
+  }
+  function ncsDetectarColunas(headers){
+    const achar = pred => headers.find(h => pred(ncsKey(h)));
+    return {
+      data: achar(k => k === 'datanc') || achar(k => k.includes('data') && !k.includes('cadastro')) || achar(k => k.includes('data')),
+      setor: achar(k => k.includes('identifiou') || k.includes('identificou')),          // "C.C. Identifiou" = setor que identificou o problema
+      codigo: achar(k => k.includes('cod') && (k.includes('prod') || k.includes('item') || k.includes('sku'))),
+      descricao: achar(k => k === 'produto' || k.includes('descri')),
+      qtde: achar(k => k === 'qtde' || k.includes('qtde') || k.includes('quantidade')),
+      id: achar(k => k === 'id' || k === 'idnc' || k === 'nrnc' || k === 'numeronc'),   // identifica cada NC (evita contar duas vezes)
+    };
+  }
+  // Algumas exportações trazem o intervalo da planilha errado (ex.: "A1:C1"): recalcula pelo conteúdo real
+  function ncsReparaRange(ws){
+    let minR = Infinity, minC = Infinity, maxR = -Infinity, maxC = -Infinity, achou = false;
+    for(const addr in ws){
+      if(addr[0] === '!') continue;
+      const m = /^([A-Z]+)([0-9]+)$/.exec(addr); if(!m) continue;
+      achou = true;
+      const c = XLSX.utils.decode_col(m[1]), r = parseInt(m[2], 10) - 1;
+      if(r < minR) minR = r; if(r > maxR) maxR = r; if(c < minC) minC = c; if(c > maxC) maxC = c;
+    }
+    if(achou) ws['!ref'] = XLSX.utils.encode_range({ s:{ r:minR, c:minC }, e:{ r:maxR, c:maxC } });
+    return ws;
+  }
+  function ncsLinhasDaPlanilha(wb){
+    for(const nome of (wb.SheetNames || [])){
+      const ws = wb.Sheets[nome]; if(!ws) continue;
+      ncsReparaRange(ws);
+      if(!ws['!ref']) continue;
+      let r = XLSX.utils.sheet_to_json(ws, { defval: null, raw: true });
+      if(!r.length){
+        const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, blankrows: false });
+        const i = aoa.findIndex(row => row.filter(v => v != null && v !== '').length >= 2);
+        if(i > -1 && i < aoa.length - 1){
+          const heads = aoa[i].map(x => x == null ? '' : String(x));
+          r = aoa.slice(i + 1).map(row => { const o = {}; heads.forEach((x, k) => { if(x) o[x] = row[k] === undefined ? null : row[k]; }); return o; })
+                .filter(o => Object.values(o).some(v => v != null && v !== ''));
+        }
+      }
+      if(r.length) return r;
+    }
+    return [];
+  }
+  // Lê as linhas do arquivo e devolve as NCs: { k (chave única), id, d (aaaammdd), setor, cod, desc, q }. Cada linha = 1 NC.
+  // A chave é o Id da NC; sem Id na linha, usa o conteúdo (data|setor|item|qtde + nº de ocorrência no arquivo).
+  function ncsExtrairLinhas(rows){
+    if(!rows || !rows.length) return { erro: 'Não encontrei linhas de dados no arquivo.' };
+    const cols = ncsDetectarColunas(Object.keys(rows[0]));
+    if(!cols.data) return { erro: 'Não encontrei a coluna de data ("Data N.C.") no arquivo.' };
+    const linhas = [], pos = new Map(), contConteudo = new Map(); let semData = 0, repetidas = 0;
+    rows.forEach(r => {
+      const d = ncsDataParaInt(r[cols.data]);
+      if(d == null){ semData++; return; }
+      const setor = (cols.setor && r[cols.setor] != null ? String(r[cols.setor]).trim() : '') || 'Não informado';
+      const cod = (cols.codigo && r[cols.codigo] != null ? String(r[cols.codigo]).trim() : '') || 'S/CÓDIGO';
+      const desc = cols.descricao && r[cols.descricao] != null ? String(r[cols.descricao]).trim() : '';
+      const q = cols.qtde ? ncsNumero(r[cols.qtde]) : 0;
+      const bruto = cols.id && r[cols.id] != null ? String(r[cols.id]).trim() : '';
+      let k, id;
+      if(bruto){ k = bruto; id = /^[1-9]\d{0,14}$/.test(bruto) ? Number(bruto) : bruto; }
+      else { const base = '#' + [d, setor, cod, q].join('|'), n = (contConteudo.get(base) || 0) + 1; contConteudo.set(base, n); k = base + '|' + n; id = k; }
+      const nc = { k, id, d, setor, cod, desc, q };
+      if(pos.has(k)){ repetidas++; linhas[pos.get(k)] = nc; return; }     // mesmo Id repetido no arquivo: vale a última
+      pos.set(k, linhas.length); linhas.push(nc);
+    });
+    if(!linhas.length) return { erro: 'Nenhuma linha com data válida na coluna "' + cols.data + '".' };
+    return { linhas, semData, repetidas, semId: !cols.id };
+  }
+  // Histórico salvo -> lista de NCs (formato desconhecido/antigo = histórico vazio)
+  function ncsDecodificar(dados){
+    if(!dados || dados.versao !== 2 || !Array.isArray(dados.D) || !Array.isArray(dados.itens) || !Array.isArray(dados.setores)) return { linhas: [], descPorCod: new Map() };
+    const descPorCod = new Map(dados.itens.map(it => [it.c, it.d || '']));
+    const linhas = dados.D.map((d, n) => ({ k: String(dados.K[n]), id: dados.K[n], d, setor: dados.setores[dados.S[n]], cod: dados.itens[dados.I[n]].c, desc: '', q: dados.Q[n] }));
+    return { linhas, descPorCod };
+  }
+  // Soma as NCs novas ao histórico. Mesmo Id: se mudou algo (data, setor, item, qtde) atualiza; senão ignora.
+  function ncsMesclar(existentes, novas){
+    const mapa = new Map(existentes.map(r => [r.k, r]));
+    let adicionadas = 0, atualizadas = 0, iguais = 0;
+    novas.forEach(n => {
+      const o = mapa.get(n.k);
+      if(!o){ mapa.set(n.k, n); adicionadas++; }
+      else if(o.d !== n.d || o.setor !== n.setor || o.cod !== n.cod || o.q !== n.q){ mapa.set(n.k, n); atualizadas++; }
+      else iguais++;
+    });
+    return { linhas: Array.from(mapa.values()), adicionadas, atualizadas, iguais };
+  }
+  // Lista de NCs -> documento salvo. Listas planas paralelas (o Firestore não aceita lista dentro de lista).
+  function ncsCodificar(linhas, descPorCod, meta){
+    const ord = linhas.slice().sort((a, b) => a.d - b.d || String(a.k).localeCompare(String(b.k), 'pt-BR', { numeric: true }));
+    const setores = [...new Set(ord.map(r => r.setor))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    const codigos = [...new Set(ord.map(r => r.cod))].sort((a, b) => a.localeCompare(b, 'pt-BR', { numeric: true }));
+    const sIdx = new Map(setores.map((s, i) => [s, i])), iIdx = new Map(codigos.map((c, i) => [c, i]));
+    return Object.assign({
+      versao: 2, total: ord.length, de: ord.length ? ord[0].d : null, ate: ord.length ? ord[ord.length - 1].d : null,
+      setores, itens: codigos.map(c => ({ c, d: descPorCod.get(c) || '' })),
+      K: ord.map(r => r.id), D: ord.map(r => r.d), S: ord.map(r => sIdx.get(r.setor)), I: ord.map(r => iIdx.get(r.cod)),
+      Q: ord.map(r => Math.round(r.q * 1000) / 1000),
+    }, meta || {});
+  }
+  function ncsRotuloItem(it){ return it.c + (it.d ? ' — ' + it.d : ''); }
+  function ncsDiasEntre(de, ate){
+    const out = [];
+    const d = new Date(Math.floor(de / 10000), Math.floor(de / 100) % 100 - 1, de % 100);
+    const fim = new Date(Math.floor(ate / 10000), Math.floor(ate / 100) % 100 - 1, ate % 100);
+    while(d <= fim && out.length < 1100){ out.push(d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate()); d.setDate(d.getDate() + 1); }
+    return out;
+  }
+  function ncsFmtDia(n, anoDigitos){
+    const dd = String(n % 100).padStart(2, '0'), mm = String(Math.floor(n / 100) % 100).padStart(2, '0'), aa = String(Math.floor(n / 10000));
+    return dd + '/' + mm + (anoDigitos === 4 ? '/' + aa : anoDigitos === 2 ? '/' + aa.slice(2) : '');
+  }
+  // Série diária (todos os dias do período, inclusive os sem NC = 0) para o filtro de uma dimensão ('setor' ou 'item')
+  function ncsSerie(dados, dim, sel){
+    const rotulos = dim === 'setor' ? dados.setores : dados.itens.map(ncsRotuloItem);
+    const idx = new Set(); if(sel.size) rotulos.forEach((r, i) => { if(sel.has(r)) idx.add(i); });
+    const arr = dim === 'setor' ? dados.S : dados.I, porDia = new Map();
+    for(let k = 0; k < dados.D.length; k++){
+      if(sel.size && !idx.has(arr[k])) continue;
+      const o = porDia.get(dados.D[k]) || { n: 0, q: 0 }; o.n += 1; o.q += dados.Q[k]; porDia.set(dados.D[k], o);
+    }
+    const dias = ncsDiasEntre(dados.de, dados.ate), comAno = Math.floor(dados.de / 10000) !== Math.floor(dados.ate / 10000) ? 2 : 0;
+    const n = dias.map(d => (porDia.get(d) || { n: 0 }).n), q = dias.map(d => (porDia.get(d) || { q: 0 }).q);
+    return { labels: dias.map(d => ncsFmtDia(d, comAno)), n, q, total: n.reduce((a, b) => a + b, 0) };
+  }
+
+  // Filtro em lista com caixas de seleção (sem seleção = todos). "sel" é alterado diretamente.
+  function ncsCriarFiltro(host, titulo, comBusca, sel, aoMudar){
+    host.innerHTML = '<span class="ncs-filter-label">' + esc(titulo) + '</span>' +
+      '<button type="button" class="ncs-filter-box"><span class="txt">Todos</span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="6 9 12 15 18 9"></polyline></svg></button>' +
+      '<div class="ncs-filter-panel">' + (comBusca ? '<input type="search" class="ncs-filter-search" placeholder="Pesquisar...">' : '') +
+      '<div class="ncs-filter-list"></div><div class="ncs-filter-foot"><span class="cnt"></span><button type="button" class="lnk">Limpar seleção</button></div></div>';
+    const box = host.querySelector('.ncs-filter-box'), txt = host.querySelector('.txt'), lista = host.querySelector('.ncs-filter-list'),
+          cnt = host.querySelector('.cnt'), busca = host.querySelector('.ncs-filter-search');
+    let opcoes = [];
+    function resumo(){
+      txt.textContent = !sel.size ? 'Todos' : (sel.size === 1 ? Array.from(sel)[0] : sel.size + ' selecionados');
+      cnt.textContent = sel.size ? sel.size + ' selecionado(s)' : 'Todos';
+    }
+    function desenhaLista(){
+      const termo = busca ? normalize(busca.value) : '';
+      const vis = opcoes.filter(o => !termo || normalize(o).includes(termo)), corte = vis.slice(0, 300);
+      lista.innerHTML = corte.length
+        ? corte.map(o => '<label class="ncs-filter-opt"><input type="checkbox" data-v="' + esc(o) + '"' + (sel.has(o) ? ' checked' : '') + '><span>' + esc(o) + '</span></label>').join('') +
+          (vis.length > corte.length ? '<div class="ncs-filter-empty">Mostrando ' + corte.length + ' de ' + vis.length + ' — refine a pesquisa.</div>' : '')
+        : '<div class="ncs-filter-empty">Nada encontrado.</div>';
+    }
+    box.addEventListener('click', () => { host.classList.toggle('open'); if(host.classList.contains('open') && busca) busca.focus(); });
+    lista.addEventListener('change', e => {
+      const cb = e.target.closest('input[type=checkbox]'); if(!cb) return;
+      const v = cb.getAttribute('data-v'); if(cb.checked) sel.add(v); else sel.delete(v);
+      resumo(); aoMudar();
+    });
+    host.querySelector('.lnk').addEventListener('click', () => { sel.clear(); resumo(); desenhaLista(); aoMudar(); });
+    if(busca) busca.addEventListener('input', desenhaLista);
+    document.addEventListener('click', e => { if(!host.contains(e.target)) host.classList.remove('open'); });
+    document.addEventListener('keydown', e => { if(e.key === 'Escape') host.classList.remove('open'); });
+    return { setOpcoes(arr){ opcoes = arr; Array.from(sel).forEach(v => { if(!opcoes.includes(v)) sel.delete(v); }); resumo(); desenhaLista(); } };
+  }
+
+  function ncsDesenhar(canvasId, atual, serie, totalId){
+    const totalEl = document.getElementById(totalId); if(totalEl) totalEl.textContent = serie.total + ' NCs no período';
+    if(typeof Chart === 'undefined') return atual;
+    const canvas = document.getElementById(canvasId); if(!canvas) return atual;
+    if(atual) atual.destroy();
+    return new Chart(canvas.getContext('2d'), {
+      type: 'line',
+      data: { labels: serie.labels, datasets: [{
+        label: 'NCs', data: serie.n,
+        borderColor: '#0B3F27', backgroundColor: 'rgba(11,63,39,0.08)',
+        fill: true, cubicInterpolationMode: 'monotone', pointRadius: 3, pointBackgroundColor: '#0B3F27'
+      }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: {
+          label: c => 'NCs: ' + c.parsed.y,
+          afterLabel: c => serie.q[c.dataIndex] ? 'Peças: ' + Math.round(serie.q[c.dataIndex]).toLocaleString('pt-BR') : ''
+        } } },
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+      }
+    });
+  }
+  function ncsRedesenhar(qual){
+    const dados = state.ncsDados; if(!dados || !dados.D) return;
+    if(!qual || qual === 'setor') chartNcsSetor = ncsDesenhar('chartNcsSetor', chartNcsSetor, ncsSerie(dados, 'setor', ncsSel.setor), 'ncsTotalSetor');
+    if(!qual || qual === 'item') chartNcsItem = ncsDesenhar('chartNcsItem', chartNcsItem, ncsSerie(dados, 'item', ncsSel.item), 'ncsTotalItem');
+  }
+  function renderNcsView(){
+    const dados = state.ncsDados, tem = !!(dados && dados.versao === 2 && dados.D && dados.D.length);
+    document.getElementById('nNcs').textContent = tem ? dados.total : 0;
+    document.getElementById('ncsVazio').style.display = tem ? 'none' : '';
+    document.getElementById('ncsGrid').style.display = tem ? '' : 'none';
+    const info = document.getElementById('ncsInfo');
+    if(!tem){
+      info.textContent = '';
+      [chartNcsSetor, chartNcsItem].forEach(c => { if(c) c.destroy(); }); chartNcsSetor = chartNcsItem = null;
+      return;
+    }
+    const u = dados.ultimaCarga, c = new Date(u ? u.em : dados.carregadoEm);
+    info.textContent = 'Histórico acumulado: ' + dados.total + ' NCs · ' + ncsFmtDia(dados.de, 4) + ' a ' + ncsFmtDia(dados.ate, 4) +
+      (u && u.arquivo ? ' · última carga: ' + u.arquivo : '') +
+      (isNaN(c) ? '' : ' em ' + c.toLocaleDateString('pt-BR') + ' às ' + c.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+    if(!ncsFiltroSetor) ncsFiltroSetor = ncsCriarFiltro(document.getElementById('ncsFiltroSetor'), 'Setor', false, ncsSel.setor, () => ncsRedesenhar('setor'));
+    if(!ncsFiltroItem) ncsFiltroItem = ncsCriarFiltro(document.getElementById('ncsFiltroItem'), 'Item', true, ncsSel.item, () => ncsRedesenhar('item'));
+    ncsFiltroSetor.setOpcoes(dados.setores);
+    ncsFiltroItem.setOpcoes(dados.itens.map(ncsRotuloItem));
+    if(document.getElementById('view-ncs').classList.contains('active')) ncsRedesenhar();
+  }
+  const NCS_LIMITE = 900000;   // bytes por documento no Firestore (limite real: 1 MB)
+  async function ncsCarregarArquivos(arquivos){
+    if(!isAdmin) return;
+    const nota = document.getElementById('ncsUploadNote');
+    const validos = Array.from(arquivos || []).filter(f => /\.xlsx?$/i.test(f.name));
+    if(!validos.length){ nota.textContent = 'Formato inválido: envie arquivos .xlsx exportados do sistema de qualidade.'; return; }
+    nota.textContent = 'Lendo ' + validos.length + ' arquivo(s)…';
+    // 1) lê tudo antes de mexer no histórico
+    const novas = [], erros = []; let semData = 0, repetidas = 0, semId = false;
+    for(const f of validos){
+      try{
+        const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
+        const ex = ncsExtrairLinhas(ncsLinhasDaPlanilha(wb));
+        if(ex.erro){ erros.push(f.name + ': ' + ex.erro); continue; }
+        ex.linhas.forEach(l => novas.push(l)); semData += ex.semData; repetidas += ex.repetidas; if(ex.semId) semId = true;
+      }catch(e){ erros.push(f.name + ': não foi possível ler (' + e.message + ')'); }
+    }
+    if(!novas.length){ nota.textContent = erros.join(' · ') || 'Nenhuma NC encontrada.'; return; }
+    // 2) soma ao histórico mais recente do banco (relê para não perder cargas feitas em outra aba/computador)
+    let remoto = null; try{ remoto = await Store.get(K_NCS_DADOS); }catch(e){}
+    const base = ncsDecodificar(remoto && remoto.versao === 2 ? remoto : state.ncsDados), descPorCod = base.descPorCod;
+    novas.forEach(n => { if(n.desc) descPorCod.set(n.cod, n.desc); else if(!descPorCod.has(n.cod)) descPorCod.set(n.cod, ''); });
+    const m = ncsMesclar(base.linhas, novas);
+    const dados = ncsCodificar(m.linhas, descPorCod, { ultimaCarga: {
+      arquivo: validos.map(f => f.name).join(', '), em: new Date().toISOString(), autor: currentUserEmail || '',
+      adicionadas: m.adicionadas, atualizadas: m.atualizadas, iguais: m.iguais } });
+    const tam = JSON.stringify(dados).length;
+    if(tam > NCS_LIMITE){
+      nota.textContent = 'O histórico passaria do limite de armazenamento do banco (' + Math.round(tam / 1000) + ' KB de ' + Math.round(NCS_LIMITE / 1000) + ' KB). Nada foi alterado — apague o histórico antigo ou fale com o suporte.';
+      return;
+    }
+    state.ncsDados = dados;
+    const salvo = await Store.set(K_NCS_DADOS, dados);
+    renderNcsView();
+    const partes = [];
+    if(m.adicionadas || m.atualizadas){
+      partes.push('Carga concluída: ' + m.adicionadas + ' NC(s) nova(s)' + (m.atualizadas ? ', ' + m.atualizadas + ' atualizada(s)' : '') + (m.iguais ? ', ' + m.iguais + ' já estavam no histórico' : '') + '.');
+    } else {
+      partes.push('Nenhuma NC nova: ' + (validos.length > 1 ? 'esses arquivos já estavam' : 'este arquivo já estava') + ' no histórico (' + m.iguais + ' NCs).');
+    }
+    partes.push('Histórico: ' + dados.total + ' NCs, de ' + ncsFmtDia(dados.de, 4) + ' a ' + ncsFmtDia(dados.ate, 4) + '.');
+    if(semData) partes.push(semData + ' linha(s) sem data válida foram ignoradas.');
+    if(repetidas) partes.push(repetidas + ' linha(s) com Id repetido no arquivo (valeu a última).');
+    if(semId) partes.push('Atenção: o arquivo não tem coluna Id; a conferência de duplicidade usa o conteúdo da linha.');
+    if(tam > NCS_LIMITE * 0.7) partes.push('O histórico já usa ' + Math.round(tam / NCS_LIMITE * 100) + '% do limite de armazenamento.');
+    if(erros.length) partes.push('Não carregados: ' + erros.join(' · '));
+    if(!salvo) partes.push('Atenção: não foi possível salvar na nuvem — os demais usuários não verão esta atualização.');
+    nota.textContent = partes.join(' ');
+    toast(m.adicionadas ? m.adicionadas + ' NC(s) nova(s) somada(s) ao histórico.' : 'Nenhuma NC nova neste arquivo.');
+  }
+  async function ncsLimparHistorico(){
+    if(!isAdmin || !state.ncsDados) return;
+    if(!window.confirm('Apagar TODO o histórico de NCs desta aba? Os gráficos ficam vazios até novos arquivos serem carregados. Esta ação não pode ser desfeita.')) return;
+    const vazio = ncsCodificar([], new Map(), { ultimaCarga: { arquivo: '(histórico apagado)', em: new Date().toISOString(), autor: currentUserEmail || '', adicionadas: 0, atualizadas: 0, iguais: 0 } });
+    state.ncsDados = vazio;
+    const salvo = await Store.set(K_NCS_DADOS, vazio);
+    ncsSel.setor.clear(); ncsSel.item.clear();
+    renderNcsView();
+    document.getElementById('ncsUploadNote').textContent = 'Histórico apagado.' + (salvo ? '' : ' Atenção: não foi possível salvar na nuvem.');
+  }
+  document.getElementById('btnNcsDatagrid').addEventListener('click', () => document.getElementById('fileNcsDatagrid').click());
+  document.getElementById('btnNcsLimpar').addEventListener('click', ncsLimparHistorico);
+  document.getElementById('fileNcsDatagrid').addEventListener('change', async e => {
+    const fs = e.target.files ? Array.from(e.target.files) : [];
+    if(fs.length) await ncsCarregarArquivos(fs);
+    e.target.value = '';
+  });
+  (function setupNcsDropzone(){
+    const zone = document.getElementById('ncsDropzone'); if(!zone) return;
+    ['dragenter', 'dragover'].forEach(evt => zone.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); if(isAdmin) zone.classList.add('dragover'); }));
+    ['dragleave', 'dragend'].forEach(evt => zone.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); zone.classList.remove('dragover'); }));
+    zone.addEventListener('drop', async e => {
+      e.preventDefault(); e.stopPropagation(); zone.classList.remove('dragover');
+      const fs = e.dataTransfer && e.dataTransfer.files ? Array.from(e.dataTransfer.files) : [];
+      if(fs.length && isAdmin) await ncsCarregarArquivos(fs);
+    });
+  })();
+
   function renderSaldoDiario(){
     const todos = Object.keys(saldoCache).sort().reverse();
     document.getElementById('nSaldo').textContent = todos.length;
@@ -2662,6 +3046,10 @@
     // Data/hora da última importação: quem está com a página aberta vê a atualização sem dar F5
     onSnapshot(doc(db, FS_COLLECTION, K_ULTIMA_IMPORT), snap => {
       if(snap.exists() && snap.data().items){ state.ultimaImportacao = snap.data().items; renderUpdatedTag(); }
+    }, () => {});
+    // Evolução de NCs: quem está com a página aberta vê o novo DataGrid sem dar F5
+    onSnapshot(doc(db, FS_COLLECTION, K_NCS_DADOS), snap => {
+      if(snap.exists() && snap.data().items){ state.ncsDados = snap.data().items; renderNcsView(); }
     }, () => {});
     // Atualizações do login de Fornecedor (documento separado). Falha de leitura aqui não derruba o painel.
     onSnapshot(doc(db, FS_COLLECTION, K_ATUAL_FORN), snap => {
